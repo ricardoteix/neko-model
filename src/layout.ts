@@ -278,6 +278,53 @@ export class DagreRadialLayoutEngine implements LayoutEngine {
       }
     }
 
+    // Resolve overlaps by pushing nodes horizontally to the right
+    const resolveOverlaps = () => {
+      const margin = 35; // minimum separation margin between core node boundaries
+      let resolvedAny = true;
+      let iterations = 0;
+
+      while (resolvedAny && iterations < 30) {
+        resolvedAny = false;
+        iterations++;
+
+        // Get all core nodes
+        const coreNodes = Array.from(nodes.values()).filter(n => n.type !== "attribute");
+
+        for (let i = 0; i < coreNodes.length; i++) {
+          for (let j = i + 1; j < coreNodes.length; j++) {
+            const A = coreNodes[i];
+            const B = coreNodes[j];
+
+            const dx = B.x - A.x;
+            const dy = B.y - A.y;
+
+            const minXDist = A.width / 2 + B.width / 2 + margin;
+            const minYDist = A.height / 2 + B.height / 2 + margin;
+
+            const absDx = Math.abs(dx);
+            const absDy = Math.abs(dy);
+
+            if (absDx < minXDist && absDy < minYDist) {
+              resolvedAny = true;
+
+              if (B.x >= A.x) {
+                // Push B to the right
+                const shiftX = minXDist - dx;
+                shiftSubGraph(B.id, A.id, shiftX, 0);
+              } else {
+                // Push A to the right
+                const shiftX = minXDist + dx;
+                shiftSubGraph(A.id, B.id, shiftX, 0);
+              }
+            }
+          }
+        }
+      }
+    };
+
+    resolveOverlaps();
+
     // 2. Radial Satellite Placement for Attributes
     const attributeRadius = options.attributeRadius || 90;
     

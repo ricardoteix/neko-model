@@ -385,4 +385,25 @@ describe("Chen ER Layout Manager Tests", () => {
     const distPlacesOrder = order.x - places.x;
     expect(distPlacesOrder).toBeCloseTo(220, 1);
   });
+
+  test("Should resolve bounding box overlaps by pushing colliding disjoint components", () => {
+    const dsl = `
+      chenER
+      entity Customer
+      relationship Places
+      entity Employee
+      
+      Customer -- Places [dir: right]
+    `;
+
+    const ast = parseDSL(dsl);
+    const graph = layoutDiagram(ast);
+
+    const places = graph.nodes.get("Places")!;
+    const employee = graph.nodes.get("Employee")!;
+
+    // Places and Employee centers must be separated by at least combined rx (50 + 70) + margin (35) = 155px
+    const distPlacesEmployee = Math.abs(employee.x - places.x);
+    expect(distPlacesEmployee).toBeGreaterThanOrEqual(155);
+  });
 });
