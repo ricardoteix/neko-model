@@ -59,3 +59,10 @@ The parser and layout engine SHALL support configuring layout directions on conn
 - **WHEN** a connection is defined as `Entity -- Relationship [dir: right]`
 - **THEN** the layout engine positions the relationship to the right of the entity on the same horizontal line ($y_1 \approx y_2$), maintaining a boundary-to-boundary spacing of at least $100\text{px}$.
 
+### Requirement: Bounding Box Overlap Resolution
+The layout engine SHALL resolve any bounding box overlaps between core nodes (entities, relationships, specializations) in the final diagram.
+
+#### Scenario: Resolving collision between disjoint branches
+- **WHEN** two core nodes (e.g. `Has` and `Manager`) have overlapping coordinate boundaries
+- **THEN** the layout engine SHALL push the rightmost node and its connected sub-graph horizontally to the right until a minimum margin of $35\text{px}$ is achieved between their boundaries.
+
