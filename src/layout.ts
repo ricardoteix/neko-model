@@ -184,11 +184,11 @@ export class DagreRadialLayoutEngine implements LayoutEngine {
         const subNode = nodes.get(sub);
         if (specNode && subNode) {
           edges.push({
-            from: sub,
-            to: spec.id,
+            from: spec.id,
+            to: sub,
             points: [
-              { x: subNode.x, y: subNode.y },
-              { x: specNode.x, y: specNode.y }
+              { x: specNode.x, y: specNode.y },
+              { x: subNode.x, y: subNode.y }
             ],
             cardinality: null,
             participation: "partial",
@@ -221,21 +221,17 @@ export class DagreRadialLayoutEngine implements LayoutEngine {
           node.y += dy;
         }
 
-        // Propagate shift to neighbors
+        // Propagate shift to neighbors (directed downstream only)
         for (const edge of edges) {
-          let neighbor: string | null = null;
           if (edge.from === currId) {
-            neighbor = edge.to;
-          } else if (edge.to === currId) {
-            neighbor = edge.from;
-          }
-
-          if (neighbor && !visited.has(neighbor)) {
-            // Only shift core nodes, not attribute nodes (which are placed dynamically later)
-            const neighNode = nodes.get(neighbor);
-            if (neighNode && neighNode.type !== "attribute") {
-              visited.add(neighbor);
-              queue.push(neighbor);
+            const neighbor = edge.to;
+            if (!visited.has(neighbor)) {
+              // Only shift core nodes, not attribute nodes (which are placed dynamically later)
+              const neighNode = nodes.get(neighbor);
+              if (neighNode && neighNode.type !== "attribute") {
+                visited.add(neighbor);
+                queue.push(neighbor);
+              }
             }
           }
         }

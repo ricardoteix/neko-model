@@ -406,4 +406,24 @@ describe("Chen ER Layout Manager Tests", () => {
     const distPlacesEmployee = Math.abs(employee.x - places.x);
     expect(distPlacesEmployee).toBeGreaterThanOrEqual(155);
   });
+
+  test("Should isolate push propagation downstream and keep parent nodes in place", () => {
+    const dsl = `
+      chenER
+      entity Customer
+      relationship Places
+      entity Order
+      
+      Customer -- Places [dir: right]
+      Places == Order [dir: right]
+    `;
+
+    const ast = parseDSL(dsl);
+    const graph = layoutDiagram(ast);
+
+    const customer = graph.nodes.get("Customer")!;
+    
+    // Customer is at the root rank on the left, and should not be dragged to the right by Places or Order pushes
+    expect(customer.x).toBeLessThan(250);
+  });
 });
