@@ -94,6 +94,7 @@ describe("Chen ER Layout Manager Tests", () => {
   test("Should layer attributes in concentric rings if count exceeds 3", () => {
     const dsl = `
       chenER
+      attribute_layout classic
       entity Customer {
         attr1
         attr2
@@ -168,5 +169,112 @@ describe("Chen ER Layout Manager Tests", () => {
     expect(shortAttr.width).toBe(80);
     // Long attribute width should scale up (46 characters * 8 + 15 = 383)
     expect(longAttr.width).toBeGreaterThan(150);
+  });
+
+  test("Should support circle-distribution spacing for single-connection entity", () => {
+    const dsl = `
+      chenER
+      attribute_layout default
+      entity Customer {
+        attr1
+        attr2
+        attr3
+      }
+      relationship Places
+      Customer -- Places
+    `;
+
+    const ast = parseDSL(dsl);
+    const graph = layoutDiagram(ast);
+
+    const customer = graph.nodes.get("Customer")!;
+    
+    // Check distances for each attribute relative to parent
+    const angles = [1, 2, 3].map((idx) => {
+      const attr = graph.nodes.get(`Customer_attr_attr${idx}`)!;
+      const dx = attr.x - customer.x;
+      const dy = attr.y - customer.y;
+      let angle = Math.atan2(dy, dx);
+      if (angle < 0) angle += 2 * Math.PI;
+      return angle;
+    }).sort((a, b) => a - b);
+
+    // With 3 attributes in a full circle, they should be separated by 2*PI/3 (~2.094 rad)
+    const diff1 = angles[1] - angles[0];
+    const diff2 = angles[2] - angles[1];
+    
+    expect(diff1).toBeCloseTo(2 * Math.PI / 3, 2);
+    expect(diff2).toBeCloseTo(2 * Math.PI / 3, 2);
+  });
+
+  test("Should support zigzag alternating radii when configured", () => {
+    const dsl = `
+      chenER
+      attribute_layout zigzag
+      entity Customer {
+        attr1
+        attr2
+        attr3
+      }
+      relationship Places
+      Customer -- Places
+    `;
+
+    const ast = parseDSL(dsl);
+    const graph = layoutDiagram(ast);
+
+    const customer = graph.nodes.get("Customer")!;
+    
+    // Distances from center
+    const distances = [1, 2, 3].map((idx) => {
+      const attr = graph.nodes.get(`Customer_attr_attr${idx}`)!;
+      const dx = attr.x - customer.x;
+      const dy = attr.y - customer.y;
+      return Math.sqrt(dx * dx + dy * dy);
+    });
+
+    // Zigzag will alternate R=90 and R=115 for the three attributes
+    // Sort to verify we have two ~90px and one ~115px
+    distances.sort((a, b) => a - b);
+    expect(distances[0]).toBeCloseTo(90, 1);
+    expect(distances[1]).toBeCloseTo(90, 1);
+    expect(distances[2]).toBeCloseTo(115, 1);
+  });
+
+  test("Should layer attributes in concentric rings using dynamic capacity when capacity is exceeded", () => {
+    const dsl = `
+      chenER
+      attribute_layout default
+      entity Customer {
+        attr1
+        attr2
+        attr3
+        attr4
+        attr5
+        attr6
+        attr7
+        attr8
+      }
+    `;
+
+    const ast = parseDSL(dsl);
+    const graph = layoutDiagram(ast, { attributeRadius: 100 });
+
+    const parent = graph.nodes.get("Customer")!;
+
+    // Distances from center
+    const distances = [1, 2, 3, 4, 5, 6, 7, 8].map((idx) => {
+      const attr = graph.nodes.get(`Customer_attr_attr${idx}`)!;
+      const dx = attr.x - parent.x;
+      const dy = attr.y - parent.y;
+      return Math.sqrt(dx * dx + dy * dy);
+    });
+
+    // 7 should be in layer 0 (distance 100) and 1 in layer 1 (distance 135)
+    const layer0Count = distances.filter((d) => Math.abs(d - 100) < 1).length;
+    const layer1Count = distances.filter((d) => Math.abs(d - 135) < 1).length;
+
+    expect(layer0Count).toBe(7);
+    expect(layer1Count).toBe(1);
   });
 });

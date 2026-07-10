@@ -53,6 +53,7 @@ export interface Connection {
 export interface DiagramConfig {
   theme?: "default" | "dark" | "forest" | "neutral";
   layout?: "default" | "force";
+  attribute_layout?: "default" | "zigzag" | "classic";
   [key: string]: any;
 }
 
@@ -105,6 +106,7 @@ export interface LayoutOptions {
   layout?: "default" | "force";
   attributeRadius?: number;
   attributeSpacing?: number;
+  attribute_layout?: "default" | "zigzag" | "classic";
 }
 
 export interface RenderOptions {

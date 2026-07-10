@@ -4,6 +4,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const editor = document.getElementById("dsl-editor") as HTMLTextAreaElement;
   const preview = document.getElementById("canvas-preview") as HTMLDivElement;
   const themeSelect = document.getElementById("theme-select") as HTMLSelectElement;
+  const spacingSelect = document.getElementById("spacing-select") as HTMLSelectElement;
   const btnCopy = document.getElementById("btn-copy") as HTMLButtonElement;
   const btnExportSvg = document.getElementById("btn-export-svg") as HTMLButtonElement;
   const btnZoomReset = document.getElementById("btn-zoom-reset") as HTMLButtonElement;
@@ -19,10 +20,11 @@ document.addEventListener("DOMContentLoaded", () => {
   function compileDiagram() {
     const code = editor.value;
     const theme = themeSelect.value as any;
+    const attribute_layout = spacingSelect.value as any;
 
     try {
       // Render to SVG
-      const svg = render(code, { theme });
+      const svg = render(code, { theme, attribute_layout });
       
       // Update DOM
       preview.innerHTML = svg;
@@ -45,8 +47,9 @@ document.addEventListener("DOMContentLoaded", () => {
     debounceTimer = setTimeout(compileDiagram, 250);
   });
 
-  // Theme dropdown change listener
+  // Theme and spacing dropdown change listeners
   themeSelect.addEventListener("change", compileDiagram);
+  spacingSelect.addEventListener("change", compileDiagram);
 
   // Copy code to clipboard
   btnCopy.addEventListener("click", () => {
@@ -67,7 +70,8 @@ document.addEventListener("DOMContentLoaded", () => {
     try {
       const code = editor.value;
       const theme = themeSelect.value as any;
-      const svgContent = render(code, { theme });
+      const attribute_layout = spacingSelect.value as any;
+      const svgContent = render(code, { theme, attribute_layout });
       
       const blob = new Blob([svgContent], { type: "image/svg+xml;charset=utf-8" });
       const url = URL.createObjectURL(blob);

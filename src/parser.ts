@@ -213,7 +213,7 @@ export class Lexer {
         // Map keywords to specific token types
         let type: Token["type"] = "IDENTIFIER";
         if (ident === "chenER") type = "HEADER";
-        else if (ident === "theme" || ident === "layout") type = "CONFIG";
+        else if (ident === "theme" || ident === "layout" || ident === "attribute_layout") type = "CONFIG";
         else if (ident === "entity") type = "ENTITY";
         else if (ident === "weak_entity") type = "WEAK_ENTITY";
         else if (ident === "relationship") type = "RELATIONSHIP";

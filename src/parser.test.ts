@@ -7,6 +7,7 @@ describe("Chen ER DSL Parser Tests", () => {
       chenER
       theme dark
       layout default
+      attribute_layout zigzag
 
       entity Customer {
         id key
@@ -22,6 +23,7 @@ describe("Chen ER DSL Parser Tests", () => {
 
     expect(ast.config.theme).toBe("dark");
     expect(ast.config.layout).toBe("default");
+    expect(ast.config.attribute_layout).toBe("zigzag");
     expect(ast.entities).toHaveLength(1);
     expect(ast.entities[0].id).toBe("Customer");
     expect(ast.entities[0].attributes).toHaveLength(2);

@@ -275,33 +275,84 @@ export class DagreRadialLayoutEngine implements LayoutEngine {
 
       // Place attributes in their allocated gaps
       let attrIdx = 0;
+      const spacingMode = options.attribute_layout || ast.config.attribute_layout || "default";
+
       for (let i = 0; i < gaps.length; i++) {
         const gap = gaps[i];
         const count = allocatedCounts[i];
         if (count === 0) continue;
 
-        const maxPerOrbit = 3;
-        const numLayers = Math.ceil(count / maxPerOrbit);
+        const gapAttrs = attrs.slice(attrIdx, attrIdx + count);
+        attrIdx += count;
 
-        for (let L = 0; L < numLayers; L++) {
-          const layerCount = Math.min(maxPerOrbit, count - L * maxPerOrbit);
-          const currentRadius = attributeRadius + L * 35;
-          const margin = layerCount === 1 ? 0.0 : 0.25; // padding near boundary lines
-          const usableSize = gap.size - 2 * margin;
+        // Partition into layers based on spacing mode
+        const layers: { r: number; attrs: Attribute[] }[] = [];
+        if (spacingMode === "classic") {
+          const maxPerOrbit = 3;
+          const numLayers = Math.ceil(gapAttrs.length / maxPerOrbit);
+          for (let L = 0; L < numLayers; L++) {
+            const slice = gapAttrs.slice(L * maxPerOrbit, (L + 1) * maxPerOrbit);
+            layers.push({ r: attributeRadius + L * 35, attrs: slice });
+          }
+        } else {
+          // default and zigzag use dynamic capacity
+          let currentLayer: Attribute[] = [];
+          let L = 0;
+          let r = attributeRadius;
+          let idx = 0;
+          while (idx < gapAttrs.length) {
+            const capacity = Math.max(1, Math.floor((r * gap.size) / 85));
+            if (currentLayer.length < capacity) {
+              currentLayer.push(gapAttrs[idx]);
+              idx++;
+            } else {
+              layers.push({ r, attrs: currentLayer });
+              currentLayer = [];
+              L++;
+              r = attributeRadius + L * 35;
+            }
+          }
+          if (currentLayer.length > 0) {
+            layers.push({ r, attrs: currentLayer });
+          }
+        }
+
+        // Project and position attributes inside each layer
+        for (let L = 0; L < layers.length; L++) {
+          const layer = layers[L];
+          const layerCount = layer.attrs.length;
+          let currentRadius = layer.r;
 
           for (let j = 0; j < layerCount; j++) {
-            if (attrIdx >= attrs.length) break;
-
-            const attr = attrs[attrIdx++];
+            const attr = layer.attrs[j];
             
             // Calculate target angle inside the gap
-            const angle = layerCount === 1 
-              ? gap.start + gap.size / 2
-              : gap.start + margin + (usableSize * j) / (layerCount - 1);
+            let angle = 0;
+            const isFullCircle = gap.size > 6.2;
+            if (spacingMode !== "classic" && isFullCircle) {
+              if (sortedAngles.length === 1) {
+                angle = gap.start + (2 * Math.PI * (j + 0.5)) / layerCount;
+              } else {
+                angle = gap.start + (2 * Math.PI * j) / layerCount;
+              }
+            } else {
+              const margin = layerCount === 1 ? 0.0 : 0.25;
+              const usableSize = gap.size - 2 * margin;
+              angle = layerCount === 1 
+                ? gap.start + gap.size / 2
+                : gap.start + margin + (usableSize * j) / (layerCount - 1);
+            }
+
+            // Apply zigzag radial offset
+            let finalRadius = currentRadius;
+            if (spacingMode === "zigzag") {
+              const zigzagOffset = (j % 2 === 0) ? 0 : 25;
+              finalRadius += zigzagOffset;
+            }
 
             // Attribute position relative to parent center
-            const ax = parentNode.x + currentRadius * Math.cos(angle);
-            const ay = parentNode.y + currentRadius * Math.sin(angle);
+            const ax = parentNode.x + finalRadius * Math.cos(angle);
+            const ay = parentNode.y + finalRadius * Math.sin(angle);
 
             const attrId = `${parentId}_attr_${attr.id}`;
             const attrType = attr.isKey 
