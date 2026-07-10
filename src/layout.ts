@@ -200,6 +200,84 @@ export class DagreRadialLayoutEngine implements LayoutEngine {
       }
     }
 
+    // Helper to shift a node and all of its downstream connected neighbors recursively
+    const shiftSubGraph = (
+      startNodeId: string,
+      excludeNodeId: string,
+      dx: number,
+      dy: number
+    ) => {
+      const visited = new Set<string>();
+      visited.add(excludeNodeId);
+
+      const queue = [startNodeId];
+      visited.add(startNodeId);
+
+      while (queue.length > 0) {
+        const currId = queue.shift()!;
+        const node = nodes.get(currId);
+        if (node) {
+          node.x += dx;
+          node.y += dy;
+        }
+
+        // Propagate shift to neighbors
+        for (const edge of edges) {
+          let neighbor: string | null = null;
+          if (edge.from === currId) {
+            neighbor = edge.to;
+          } else if (edge.to === currId) {
+            neighbor = edge.from;
+          }
+
+          if (neighbor && !visited.has(neighbor)) {
+            // Only shift core nodes, not attribute nodes (which are placed dynamically later)
+            const neighNode = nodes.get(neighbor);
+            if (neighNode && neighNode.type !== "attribute") {
+              visited.add(neighbor);
+              queue.push(neighbor);
+            }
+          }
+        }
+      }
+    };
+
+    // Apply relative connection directions (dir metadata)
+    for (const conn of ast.connections) {
+      if (conn.dir) {
+        const fromNode = nodes.get(conn.from);
+        const toNode = nodes.get(conn.to);
+        if (fromNode && toNode) {
+          // Determine layout spacing based on directions
+          let spacing = 0;
+          if (conn.dir === "right" || conn.dir === "left") {
+            spacing = fromNode.width / 2 + toNode.width / 2 + 100;
+          } else {
+            spacing = fromNode.height / 2 + toNode.height / 2 + 80;
+          }
+
+          let targetX = fromNode.x;
+          let targetY = fromNode.y;
+
+          if (conn.dir === "right") {
+            targetX = fromNode.x + spacing;
+          } else if (conn.dir === "left") {
+            targetX = fromNode.x - spacing;
+          } else if (conn.dir === "down") {
+            targetY = fromNode.y + spacing;
+          } else if (conn.dir === "up") {
+            targetY = fromNode.y - spacing;
+          }
+
+          const dx = targetX - toNode.x;
+          const dy = targetY - toNode.y;
+
+          // Apply shift to target node and propagate downstream
+          shiftSubGraph(conn.to, conn.from, dx, dy);
+        }
+      }
+    }
+
     // 2. Radial Satellite Placement for Attributes
     const attributeRadius = options.attributeRadius || 90;
     

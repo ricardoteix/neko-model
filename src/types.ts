@@ -48,6 +48,7 @@ export interface Connection {
   role: string | null;
   labelOffset: [number, number] | null;
   style: { stroke?: string; strokeWidth?: number } | null;
+  dir?: "left" | "right" | "up" | "down" | null;
 }
 
 export interface DiagramConfig {

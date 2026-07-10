@@ -416,7 +416,8 @@ export class Parser {
           participation,
           role,
           labelOffset: metadata.offset,
-          style: metadata.style ? { stroke: metadata.style.stroke } : null
+          style: metadata.style ? { stroke: metadata.style.stroke } : null,
+          dir: (metadata.dir === "left" || metadata.dir === "right" || metadata.dir === "up" || metadata.dir === "down") ? metadata.dir : null
         });
       } else {
         throw new ParseError(`Unexpected statement starting with token '${tok.type}' (${tok.value})`, tok.line, tok.col);
@@ -502,9 +503,10 @@ export class Parser {
     };
   }
 
-  private parseBracketMetadata(): { offset: [number, number] | null; style: StyleOverride | null } {
+  private parseBracketMetadata(): { offset: [number, number] | null; style: StyleOverride | null; dir: string | null } {
     let offset: [number, number] | null = null;
     let style: StyleOverride | null = null;
+    let dir: string | null = null;
 
     if (this.peek().type === "BRACKET_OPEN") {
       this.advance(); // consume '['
@@ -519,6 +521,14 @@ export class Parser {
           this.match("COMMA");
           const yTok = this.match("NUMBER");
           offset = [parseFloat(xTok.value), parseFloat(yTok.value)];
+        } else if (keyTok.value === "dir") {
+          let val = "";
+          if (this.peek().type === "STRING") {
+            val = this.advance().value;
+          } else {
+            val = this.match("IDENTIFIER").value;
+          }
+          dir = val;
         } else if (keyTok.value === "fill" || keyTok.value === "stroke" || keyTok.value === "text") {
           if (!style) style = {};
           
@@ -542,7 +552,7 @@ export class Parser {
       this.match("BRACKET_CLOSE");
     }
 
-    return { offset, style };
+    return { offset, style, dir };
   }
 }
 

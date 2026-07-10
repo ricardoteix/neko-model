@@ -350,4 +350,39 @@ describe("Chen ER Layout Manager Tests", () => {
     expect(specNode.width).toBe(80);
     expect(specNode.height).toBe(80);
   });
+
+  test("Should position nodes horizontally when dir: right is configured on connections", () => {
+    const dsl = `
+      chenER
+      entity Customer
+      relationship Places
+      entity Order
+      
+      Customer -- Places [dir: right]
+      Places == Order [dir: right]
+    `;
+
+    const ast = parseDSL(dsl);
+    const graph = layoutDiagram(ast);
+
+    const customer = graph.nodes.get("Customer")!;
+    const places = graph.nodes.get("Places")!;
+    const order = graph.nodes.get("Order")!;
+
+    // Places should be to the right of Customer
+    expect(places.x).toBeGreaterThan(customer.x);
+    expect(places.y).toBeCloseTo(customer.y, 1);
+
+    // Order should be to the right of Places
+    expect(order.x).toBeGreaterThan(places.x);
+    expect(order.y).toBeCloseTo(places.y, 1);
+
+    // Constant horizontal distance spacing check: rx_customer + rx_places + 100 = 70 + 50 + 100 = 220px
+    const distCustomerPlaces = places.x - customer.x;
+    expect(distCustomerPlaces).toBeCloseTo(220, 1);
+
+    // rx_places + rx_order + 100 = 50 + 70 + 100 = 220px
+    const distPlacesOrder = order.x - places.x;
+    expect(distPlacesOrder).toBeCloseTo(220, 1);
+  });
 });
