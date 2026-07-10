@@ -1,0 +1,37 @@
+{
+  "name": "chen-er-renderer",
+  "version": "1.0.0",
+  "description": "Standalone Chen ER Diagram DSL Parser and SVG Renderer",
+  "type": "module",
+  "main": "dist/chen-er.umd.js",
+  "module": "dist/chen-er.es.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "dev": "vite playground",
+    "build:lib": "vite build --config vite.config.ts",
+    "build:playground": "vite build --config vite.playground.config.ts",
+    "build": "npm run build:lib && npm run build:playground",
+    "test": "vitest run"
+  },
+  "keywords": [
+    "er",
+    "diagram",
+    "chen-notation",
+    "dsl",
+    "mermaid",
+    "svg",
+    "renderer"
+  ],
+  "author": "Antigravity",
+  "license": "MIT",
+  "dependencies": {
+    "dagre": "^0.8.5"
+  },
+  "devDependencies": {
+    "@types/dagre": "^0.7.48",
+    "typescript": "^5.4.5",
+    "vite": "^5.2.11",
+    "vite-plugin-dts": "^3.9.1",
+    "vitest": "^1.6.0"
+  }
+}
