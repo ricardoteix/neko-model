@@ -52,3 +52,10 @@ The layout engine SHALL represent specialization nodes with a bounding box of $8
 - **WHEN** rendering a specialization node in SVG
 - **THEN** it has a base width of $80\text{px}$ and a height of $80\text{px}$, and its connection arrow marker points to its border at $40\text{px}$ from center (plus line clearance).
 
+### Requirement: Connection Layout Directions
+The parser and layout engine SHALL support configuring layout directions on connection lines using the `dir` bracket metadata.
+
+#### Scenario: Placing a relationship to the right of an entity
+- **WHEN** a connection is defined as `Entity -- Relationship [dir: right]`
+- **THEN** the layout engine positions the relationship to the right of the entity on the same horizontal line ($y_1 \approx y_2$), maintaining a boundary-to-boundary spacing of at least $100\text{px}$.
+
