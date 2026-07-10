@@ -43,6 +43,7 @@ describe("Chen ER Layout Manager Tests", () => {
   test("Should position attribute satellites radially around parent node", () => {
     const dsl = `
       chenER
+      attribute_layout classic
       entity Customer {
         name
       }
@@ -233,12 +234,12 @@ describe("Chen ER Layout Manager Tests", () => {
       return Math.sqrt(dx * dx + dy * dy);
     });
 
-    // Zigzag will alternate R=90 and R=115 for the three attributes
-    // Sort to verify we have two ~90px and one ~115px
+    // Zigzag will alternate R=105 and R=110 for the three attributes
+    // Sort to verify we have one ~105px (odd, base 80+25) and two ~110px (even, base 110)
     distances.sort((a, b) => a - b);
-    expect(distances[0]).toBeCloseTo(90, 1);
-    expect(distances[1]).toBeCloseTo(90, 1);
-    expect(distances[2]).toBeCloseTo(115, 1);
+    expect(distances[0]).toBeCloseTo(105, 1);
+    expect(distances[1]).toBeCloseTo(110, 1);
+    expect(distances[2]).toBeCloseTo(110, 1);
   });
 
   test("Should layer attributes in concentric rings using dynamic capacity when capacity is exceeded", () => {
@@ -270,11 +271,62 @@ describe("Chen ER Layout Manager Tests", () => {
       return Math.sqrt(dx * dx + dy * dy);
     });
 
-    // 7 should be in layer 0 (distance 100) and 1 in layer 1 (distance 135)
-    const layer0Count = distances.filter((d) => Math.abs(d - 100) < 1).length;
-    const layer1Count = distances.filter((d) => Math.abs(d - 135) < 1).length;
+    // 7 should be in layer 0 (distance < 125) and 1 in layer 1 (distance >= 125)
+    const layer0Count = distances.filter((d) => d < 125).length;
+    const layer1Count = distances.filter((d) => d >= 125).length;
 
     expect(layer0Count).toBe(7);
     expect(layer1Count).toBe(1);
+  });
+
+  test("Should position horizontal attributes clear of wide entity borders", () => {
+    const dsl = `
+      chenER
+      entity Customer {
+        name
+      }
+      relationship RelTop
+      relationship RelBottom
+      RelTop -- Customer
+      Customer -- RelBottom
+    `;
+
+    const ast = parseDSL(dsl);
+    const graph = layoutDiagram(ast);
+
+    const customer = graph.nodes.get("Customer")!;
+    const attr = graph.nodes.get("Customer_attr_name")!;
+    
+    const dx = Math.abs(attr.x - customer.x);
+    const dy = Math.abs(attr.y - customer.y);
+    const distance = Math.sqrt(dx * dx + dy * dy);
+
+    // Horizontal distance should be exactly rx (70) + attrWidth/2 (40) + margin (10) = 120px
+    expect(distance).toBeCloseTo(120, 1);
+  });
+
+  test("Should position composite child attributes without overlaps", () => {
+    const dsl = `
+      chenER
+      entity Customer {
+        address composite(street, city, zip)
+      }
+      relationship Places
+      Customer -- Places
+    `;
+
+    const ast = parseDSL(dsl);
+    const graph = layoutDiagram(ast);
+
+    const street = graph.nodes.get("Customer_attr_address_child_street")!;
+    const city = graph.nodes.get("Customer_attr_address_child_city")!;
+    const zip = graph.nodes.get("Customer_attr_address_child_zip")!;
+
+    // Verify distance between street and city is greater than sum of their radii (37.5 + 37.5 = 75px)
+    const distStreetCity = Math.sqrt(Math.pow(street.x - city.x, 2) + Math.pow(street.y - city.y, 2));
+    const distCityZip = Math.sqrt(Math.pow(city.x - zip.x, 2) + Math.pow(city.y - zip.y, 2));
+
+    expect(distStreetCity).toBeGreaterThan(74.5);
+    expect(distCityZip).toBeGreaterThan(74.5);
   });
 });

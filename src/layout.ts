@@ -210,6 +210,22 @@ export class DagreRadialLayoutEngine implements LayoutEngine {
       const parentNode = nodes.get(parentId);
       if (!parentNode) return;
 
+      // Helper to calculate the parent node's boundary distance at a given angle
+      const getParentRadiusAtAngle = (node: PositionedNode, angle: number): number => {
+        const cos = Math.abs(Math.cos(angle));
+        const sin = Math.abs(Math.sin(angle));
+        const rx = node.width / 2;
+        const ry = node.height / 2;
+        
+        if (node.type === "relationship" || node.type === "identifying_relationship") {
+          return 1 / ((cos / rx) + (sin / ry));
+        }
+        return Math.min(
+          cos > 0.0001 ? rx / cos : Infinity,
+          sin > 0.0001 ? ry / sin : Infinity
+        );
+      };
+
       // Find all connection angles relative to this parent center to determine blocked sectors
       const blockedAngles: number[] = [];
       
@@ -298,7 +314,7 @@ export class DagreRadialLayoutEngine implements LayoutEngine {
           // default and zigzag use dynamic capacity
           let currentLayer: Attribute[] = [];
           let L = 0;
-          let r = attributeRadius;
+          let r = (parentNode.width / 2 + parentNode.height / 2) / 2 + 50;
           let idx = 0;
           while (idx < gapAttrs.length) {
             const capacity = Math.max(1, Math.floor((r * gap.size) / 85));
@@ -343,11 +359,20 @@ export class DagreRadialLayoutEngine implements LayoutEngine {
                 : gap.start + margin + (usableSize * j) / (layerCount - 1);
             }
 
-            // Apply zigzag radial offset
+            // Save Positioned Attribute with dynamic width to compute base radius
+            const attrWidth = Math.max(80, attr.id.length * 8 + 15);
+
             let finalRadius = currentRadius;
-            if (spacingMode === "zigzag") {
-              const zigzagOffset = (j % 2 === 0) ? 0 : 25;
-              finalRadius += zigzagOffset;
+            if (spacingMode !== "classic") {
+              // Calculate dynamic base radius clear of parent borders
+              const parentBorderDist = getParentRadiusAtAngle(parentNode, angle);
+              const dynamicBaseRadius = parentBorderDist + attrWidth / 2 + 10;
+              finalRadius = dynamicBaseRadius + L * 35;
+
+              if (spacingMode === "zigzag") {
+                const zigzagOffset = (j % 2 === 0) ? 0 : 25;
+                finalRadius += zigzagOffset;
+              }
             }
 
             // Attribute position relative to parent center
@@ -366,7 +391,6 @@ export class DagreRadialLayoutEngine implements LayoutEngine {
               : "regular";
 
             // Save Positioned Attribute with dynamic width
-            const attrWidth = Math.max(80, attr.id.length * 8 + 15);
             nodes.set(attrId, {
               id: attrId,
               type: "attribute",
@@ -399,12 +423,12 @@ export class DagreRadialLayoutEngine implements LayoutEngine {
 
             // Handle composite children
             if (attr.isComposite && attr.children.length > 0) {
-              // Position child attributes in a smaller sub-radial fan out from parent attribute
-              const childRadius = 55;
+              // Position child attributes in a larger sub-radial fan out from parent attribute
+              const childRadius = 80;
               // Fan centered away from parent entity
               const parentAngle = angle; 
-              const startAngle = parentAngle - Math.PI / 4;
-              const sizeAngle = Math.PI / 2;
+              const startAngle = parentAngle - Math.PI * 0.35;
+              const sizeAngle = Math.PI * 0.7;
 
               for (let c = 0; c < attr.children.length; c++) {
                 const child = attr.children[c];
