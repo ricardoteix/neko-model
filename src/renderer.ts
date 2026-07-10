@@ -234,8 +234,8 @@ export function renderSVG(graph: PositionedGraph, options: RenderOptions = {}): 
 
   // Inject defs and arrowhead markers
   output += `  <defs>\n`;
-  output += `    <marker id="chen-arrow" viewBox="0 0 10 10" refX="27" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">\n`;
-  output += `      <path d="M 0 0 L 10 5 L 0 10 z" fill="var(--chen-line)" />\n`;
+  output += `    <marker id="chen-arrow" viewBox="0 0 10 10" refX="42" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">\n`;
+    output += `      <path d="M 0 0 L 10 5 L 0 10 z" fill="var(--chen-line)" />\n`;
   output += `    </marker>\n`;
   output += `  </defs>\n\n`;
 
@@ -299,7 +299,7 @@ function drawNode(node: PositionedNode): string {
       const shorthand = `(${p}, ${s})`;
       return `  <g id="node_${node.id}">
     <polygon points="${triPoints}" class="chen-spec-triangle" />
-    <text x="${x}" y="${y + 8}" class="chen-text chen-spec-text">${shorthand}</text>
+    <text x="${x}" y="${y + 13}" class="chen-text chen-spec-text">${shorthand}</text>
   </g>\n`;
 
     case "attribute":

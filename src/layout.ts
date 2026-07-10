@@ -42,7 +42,7 @@ export class DagreRadialLayoutEngine implements LayoutEngine {
 
     // Add Specializations to core layout
     for (const spec of ast.specializations) {
-      g.setNode(spec.id, { width: 50, height: 50 });
+      g.setNode(spec.id, { width: 80, height: 80 });
     }
 
     // Add Core Edges (Entities connected to Relationships, and Specialization connections)
@@ -123,15 +123,15 @@ export class DagreRadialLayoutEngine implements LayoutEngine {
         type: "specialization",
         x,
         y,
-        width: 50,
-        height: 50,
+        width: 80,
+        height: 80,
         label,
         offset: null,
         style: null,
         specializationType: spec.type,
         participation: spec.participation
       });
-      updateBounds(x, y, 50, 50);
+      updateBounds(x, y, 80, 80);
     }
 
     // Build Positioned Edges for core graph

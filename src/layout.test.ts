@@ -329,4 +329,25 @@ describe("Chen ER Layout Manager Tests", () => {
     expect(distStreetCity).toBeGreaterThan(74.5);
     expect(distCityZip).toBeGreaterThan(74.5);
   });
+
+  test("Should size specialization nodes to 80x80 with padding", () => {
+    const dsl = `
+      chenER
+      specialization EmployeeType {
+        type: disjoint
+        participation: total
+        superclass: Employee
+        subclasses: Manager
+      }
+      entity Employee
+      entity Manager
+    `;
+
+    const ast = parseDSL(dsl);
+    const graph = layoutDiagram(ast);
+
+    const specNode = graph.nodes.get("EmployeeType")!;
+    expect(specNode.width).toBe(80);
+    expect(specNode.height).toBe(80);
+  });
 });
