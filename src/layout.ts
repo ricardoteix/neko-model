@@ -205,7 +205,8 @@ export class DagreRadialLayoutEngine implements LayoutEngine {
       startNodeId: string,
       excludeNodeId: string,
       dx: number,
-      dy: number
+      dy: number,
+      compSet: Set<string>
     ) => {
       const visited = new Set<string>();
       visited.add(excludeNodeId);
@@ -221,11 +222,11 @@ export class DagreRadialLayoutEngine implements LayoutEngine {
           node.y += dy;
         }
 
-        // Propagate shift to neighbors (directed downstream only)
+        // Propagate shift to neighbors (directed downstream only, constrained to current component)
         for (const edge of edges) {
           if (edge.from === currId) {
             const neighbor = edge.to;
-            if (!visited.has(neighbor)) {
+            if (!visited.has(neighbor) && compSet.has(neighbor)) {
               // Only shift core nodes, not attribute nodes (which are placed dynamically later)
               const neighNode = nodes.get(neighbor);
               if (neighNode && neighNode.type !== "attribute") {
@@ -238,88 +239,174 @@ export class DagreRadialLayoutEngine implements LayoutEngine {
       }
     };
 
-    // Apply relative connection directions (dir metadata)
-    for (const conn of ast.connections) {
-      if (conn.dir) {
-        const fromNode = nodes.get(conn.from);
-        const toNode = nodes.get(conn.to);
-        if (fromNode && toNode) {
-          // Determine layout spacing based on directions
-          let spacing = 0;
-          if (conn.dir === "right" || conn.dir === "left") {
-            spacing = fromNode.width / 2 + toNode.width / 2 + 100;
-          } else {
-            spacing = fromNode.height / 2 + toNode.height / 2 + 80;
+    // Identify connected components of core nodes
+    const visitedCore = new Set<string>();
+    const components: string[][] = [];
+
+    for (const nodeId of nodes.keys()) {
+      const node = nodes.get(nodeId)!;
+      if (node.type === "attribute") continue;
+      if (visitedCore.has(nodeId)) continue;
+
+      // BFS to find all nodes in this component
+      const comp: string[] = [];
+      const queue = [nodeId];
+      visitedCore.add(nodeId);
+
+      while (queue.length > 0) {
+        const currId = queue.shift()!;
+        comp.push(currId);
+
+        // Traverse neighbors (undirected for component traversal)
+        for (const edge of edges) {
+          let neighbor: string | null = null;
+          if (edge.from === currId) {
+            neighbor = edge.to;
+          } else if (edge.to === currId) {
+            neighbor = edge.from;
           }
 
-          let targetX = fromNode.x;
-          let targetY = fromNode.y;
-
-          if (conn.dir === "right") {
-            targetX = fromNode.x + spacing;
-          } else if (conn.dir === "left") {
-            targetX = fromNode.x - spacing;
-          } else if (conn.dir === "down") {
-            targetY = fromNode.y + spacing;
-          } else if (conn.dir === "up") {
-            targetY = fromNode.y - spacing;
-          }
-
-          const dx = targetX - toNode.x;
-          const dy = targetY - toNode.y;
-
-          // Apply shift to target node and propagate downstream
-          shiftSubGraph(conn.to, conn.from, dx, dy);
-        }
-      }
-    }
-
-    // Resolve overlaps by pushing nodes horizontally to the right
-    const resolveOverlaps = () => {
-      const margin = 35; // minimum separation margin between core node boundaries
-      let resolvedAny = true;
-      let iterations = 0;
-
-      while (resolvedAny && iterations < 30) {
-        resolvedAny = false;
-        iterations++;
-
-        // Get all core nodes
-        const coreNodes = Array.from(nodes.values()).filter(n => n.type !== "attribute");
-
-        for (let i = 0; i < coreNodes.length; i++) {
-          for (let j = i + 1; j < coreNodes.length; j++) {
-            const A = coreNodes[i];
-            const B = coreNodes[j];
-
-            const dx = B.x - A.x;
-            const dy = B.y - A.y;
-
-            const minXDist = A.width / 2 + B.width / 2 + margin;
-            const minYDist = A.height / 2 + B.height / 2 + margin;
-
-            const absDx = Math.abs(dx);
-            const absDy = Math.abs(dy);
-
-            if (absDx < minXDist && absDy < minYDist) {
-              resolvedAny = true;
-
-              if (B.x >= A.x) {
-                // Push B to the right
-                const shiftX = minXDist - dx;
-                shiftSubGraph(B.id, A.id, shiftX, 0);
-              } else {
-                // Push A to the right
-                const shiftX = minXDist + dx;
-                shiftSubGraph(A.id, B.id, shiftX, 0);
-              }
+          if (neighbor && !visitedCore.has(neighbor)) {
+            const neighNode = nodes.get(neighbor);
+            if (neighNode && neighNode.type !== "attribute") {
+              visitedCore.add(neighbor);
+              queue.push(neighbor);
             }
           }
         }
       }
-    };
+      components.push(comp);
+    }
 
-    resolveOverlaps();
+    // Measure original min x of each component for sorting
+    const originalMinX = new Map<string[], number>();
+    for (const comp of components) {
+      let minXVal = Infinity;
+      for (const id of comp) {
+        minXVal = Math.min(minXVal, nodes.get(id)!.x);
+      }
+      originalMinX.set(comp, minXVal);
+    }
+
+    // Sort components to preserve Dagre's relative horizontal order
+    components.sort((a, b) => originalMinX.get(a)! - originalMinX.get(b)!);
+
+    // Apply local layout (connection directions and overlap resolution) inside each component
+    for (const comp of components) {
+      const compSet = new Set(comp);
+
+      // Apply relative connection directions (dir metadata) locally
+      for (const conn of ast.connections) {
+        if (conn.dir && compSet.has(conn.from) && compSet.has(conn.to)) {
+          const fromNode = nodes.get(conn.from);
+          const toNode = nodes.get(conn.to);
+          if (fromNode && toNode) {
+            // Determine layout spacing based on directions
+            let spacing = 0;
+            if (conn.dir === "right" || conn.dir === "left") {
+              spacing = fromNode.width / 2 + toNode.width / 2 + 100;
+            } else {
+              spacing = fromNode.height / 2 + toNode.height / 2 + 80;
+            }
+
+            let targetX = fromNode.x;
+            let targetY = fromNode.y;
+
+            if (conn.dir === "right") {
+              targetX = fromNode.x + spacing;
+            } else if (conn.dir === "left") {
+              targetX = fromNode.x - spacing;
+            } else if (conn.dir === "down") {
+              targetY = fromNode.y + spacing;
+            } else if (conn.dir === "up") {
+              targetY = fromNode.y - spacing;
+            }
+
+            const dx = targetX - toNode.x;
+            const dy = targetY - toNode.y;
+
+            // Apply shift to target node and propagate downstream within component
+            shiftSubGraph(conn.to, conn.from, dx, dy, compSet);
+          }
+        }
+      }
+
+      // Resolve overlaps by pushing nodes horizontally to the right locally
+      const resolveLocalOverlaps = () => {
+        const margin = 35; // minimum separation margin between core node boundaries
+        let resolvedAny = true;
+        let iterations = 0;
+
+        while (resolvedAny && iterations < 30) {
+          resolvedAny = false;
+          iterations++;
+
+          // Get core nodes belonging to this component
+          const compNodes = comp.map(id => nodes.get(id)!).filter(n => n !== undefined);
+
+          for (let i = 0; i < compNodes.length; i++) {
+            for (let j = i + 1; j < compNodes.length; j++) {
+              const A = compNodes[i];
+              const B = compNodes[j];
+
+              const dx = B.x - A.x;
+              const dy = B.y - A.y;
+
+              const minXDist = A.width / 2 + B.width / 2 + margin;
+              const minYDist = A.height / 2 + B.height / 2 + margin;
+
+              const absDx = Math.abs(dx);
+              const absDy = Math.abs(dy);
+
+              if (absDx < minXDist && absDy < minYDist) {
+                resolvedAny = true;
+
+                if (B.x >= A.x) {
+                  // Push B to the right
+                  const shiftX = minXDist - dx;
+                  shiftSubGraph(B.id, A.id, shiftX, 0, compSet);
+                } else {
+                  // Push A to the right
+                  const shiftX = minXDist + dx;
+                  shiftSubGraph(A.id, B.id, shiftX, 0, compSet);
+                }
+              }
+            }
+          }
+        }
+      };
+
+      resolveLocalOverlaps();
+    }
+
+    // Position sorted components side-by-side
+    let currentXOffset = 0;
+    const componentSpacing = 80;
+
+    for (let c = 0; c < components.length; c++) {
+      const comp = components[c];
+
+      // Measure current bounding box of this component
+      let compMinX = Infinity;
+      let compMaxX = -Infinity;
+      for (const id of comp) {
+        const n = nodes.get(id)!;
+        compMinX = Math.min(compMinX, n.x - n.width / 2);
+        compMaxX = Math.max(compMaxX, n.x + n.width / 2);
+      }
+
+      // Calculate shift to align compMinX to currentXOffset
+      const dx = currentXOffset - compMinX;
+      if (dx !== 0) {
+        for (const id of comp) {
+          const n = nodes.get(id)!;
+          n.x += dx;
+        }
+      }
+
+      // Advance offset to the right
+      currentXOffset += (compMaxX - compMinX) + componentSpacing;
+    }
 
     // 2. Radial Satellite Placement for Attributes
     const attributeRadius = options.attributeRadius || 90;

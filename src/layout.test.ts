@@ -426,4 +426,53 @@ describe("Chen ER Layout Manager Tests", () => {
     // Customer is at the root rank on the left, and should not be dragged to the right by Places or Order pushes
     expect(customer.x).toBeLessThan(250);
   });
+
+  test("Should position disconnected components side-by-side without interleaving", () => {
+    const dsl = `
+      chenER
+      entity Customer
+      relationship Places
+      entity Order
+      
+      Customer -- Places [dir: right]
+      Places == Order [dir: right]
+      
+      entity Employee
+      specialization EmployeeType {
+        type: disjoint
+        participation: total
+        superclass: Employee
+        subclasses: Manager
+      }
+      entity Manager
+    `;
+
+    const ast = parseDSL(dsl);
+    const graph = layoutDiagram(ast);
+
+    // Component 1: Customer, Places, Order
+    const customer = graph.nodes.get("Customer")!;
+    const places = graph.nodes.get("Places")!;
+    const order = graph.nodes.get("Order")!;
+
+    const comp1MaxX = Math.max(
+      customer.x + customer.width / 2,
+      places.x + places.width / 2,
+      order.x + order.width / 2
+    );
+
+    // Component 2: Employee, EmployeeType, Manager
+    const employee = graph.nodes.get("Employee")!;
+    const employeeType = graph.nodes.get("EmployeeType")!;
+    const manager = graph.nodes.get("Manager")!;
+
+    const comp2MinX = Math.min(
+      employee.x - employee.width / 2,
+      employeeType.x - employeeType.width / 2,
+      manager.x - manager.width / 2
+    );
+
+    // Component 2 must be entirely to the right of Component 1, separated by at least the 80px componentSpacing
+    expect(comp2MinX).toBeGreaterThanOrEqual(comp1MaxX + 80);
+  });
 });
