@@ -11,7 +11,9 @@
     "build:lib": "vite build --config vite.config.ts",
     "build:playground": "vite build --config vite.playground.config.ts",
     "build": "npm run build:lib && npm run build:playground",
-    "test": "vitest run"
+    "test": "vitest run", 
+    "predeploy": "npm run build",
+    "deploy": "gh-pages -d dist-playground"
   },
   "keywords": [
     "er",
