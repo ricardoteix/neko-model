@@ -148,6 +148,28 @@ describe("Chen ER DSL Parser Tests", () => {
     expect(spec.subclasses).toEqual(["Manager", "Technician", "Secretary"]);
   });
 
+  test("Should parse manual position metadata [pos: X, Y]", () => {
+    const dsl = `
+      chenER
+      entity Customer [pos: 100, 200]
+      weak_entity Order [pos: -50, -150]
+      relationship Places [pos: 300, 400]
+      specialization EmployeeType [pos: 10, 20] {
+        type: disjoint
+        participation: total
+        superclass: Employee
+        subclasses: Manager, Technician
+      }
+    `;
+
+    const ast = parseDSL(dsl);
+
+    expect(ast.entities[0].pos).toEqual({ x: 100, y: 200 });
+    expect(ast.entities[1].pos).toEqual({ x: -50, y: -150 });
+    expect(ast.relationships[0].pos).toEqual({ x: 300, y: 400 });
+    expect(ast.specializations[0].pos).toEqual({ x: 10, y: 20 });
+  });
+
   test("Should throw syntax errors with correct line and column info", () => {
     const dsl = `
       chenER

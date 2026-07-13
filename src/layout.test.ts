@@ -475,4 +475,24 @@ describe("Chen ER Layout Manager Tests", () => {
     // Component 2 must be entirely to the right of Component 1, separated by at least the 80px componentSpacing
     expect(comp2MinX).toBeGreaterThanOrEqual(comp1MaxX + 80);
   });
+
+  test("Should bypass layout coordinates for nodes with [pos: X, Y] metadata overrides", () => {
+    const dsl = `
+      chenER
+      entity Customer [pos: 120, 240]
+      relationship Places [pos: 340, 480]
+      Customer -- Places
+    `;
+
+    const ast = parseDSL(dsl);
+    const graph = layoutDiagram(ast);
+
+    const customer = graph.nodes.get("Customer")!;
+    const places = graph.nodes.get("Places")!;
+
+    expect(customer.x).toBe(120);
+    expect(customer.y).toBe(240);
+    expect(places.x).toBe(340);
+    expect(places.y).toBe(480);
+  });
 });

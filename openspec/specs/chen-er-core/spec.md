@@ -80,3 +80,10 @@ The layout engine SHALL group disconnected sub-graphs (independent connected com
 - **WHEN** the diagram contains two disjoint graphs (e.g. `Customer-Order` and `Employee`)
 - **THEN** the layout engine SHALL position all nodes of the second component entirely to the right of the first component, ensuring a minimum boundary-to-boundary gap of at least $80\text{px}$ is maintained and no lines cross between components.
 
+### Requirement: Manual Position Overrides
+The layout engine SHALL support overriding coordinate placements computed by Dagre for any core node using manually specified positions.
+
+#### Scenario: Placing an entity at custom coordinates
+- **WHEN** an entity has a position override `[pos: 150, 220]`
+- **THEN** the layout engine SHALL place the entity center exactly at `x = 150`, `y = 220` in the final diagram layout.
+

@@ -47,8 +47,38 @@
 
     <!-- Main Workspace -->
     <main class="workspace">
+      <!-- Toolbox Panel -->
+      <section class="panel toolbox-panel">
+        <div class="panel-header" style="padding: 12px 10px; justify-content: center;">
+          <h2 style="font-size: 11px;">Tools</h2>
+        </div>
+        <div class="toolbox-items">
+          <button class="tool-btn active" data-tool="select" title="Selection Tool (Esc)">
+            <span class="tool-icon">↖</span>
+            <span class="tool-label">Select</span>
+          </button>
+          <div class="tool-divider"></div>
+          <button class="tool-btn" data-tool="entity" title="Add Entity">
+            <span class="tool-icon">⬡</span>
+            <span class="tool-label">Entity</span>
+          </button>
+          <button class="tool-btn" data-tool="relationship" title="Add Relationship">
+            <span class="tool-icon">♢</span>
+            <span class="tool-label">Rel</span>
+          </button>
+          <button class="tool-btn" data-tool="specialization" title="Add Specialization">
+            <span class="tool-icon">◯</span>
+            <span class="tool-label">Spec</span>
+          </button>
+          <button class="tool-btn" data-tool="attribute" title="Add Attribute">
+            <span class="tool-icon">⚬</span>
+            <span class="tool-label">Attr</span>
+          </button>
+        </div>
+      </section>
+
       <!-- Left Panel: Code Editor -->
-      <section class="panel editor-panel">
+      <section class="panel editor-panel" id="editor-panel">
         <div class="panel-header">
           <h2>DSL Source</h2>
           <span class="file-name">diagram.chen</span>
@@ -102,23 +132,45 @@ entity Technician</textarea>
         </div>
       </section>
 
-      <!-- Right Panel: SVG Visualizer -->
+      <!-- Center Panel: SVG Visualizer -->
       <section class="panel visualizer-panel">
         <div class="panel-header">
           <h2>Live Preview</h2>
-          <div class="canvas-actions">
-            <button id="btn-zoom-reset" class="btn btn-sm">Reset View</button>
+          <div class="canvas-actions" style="display: flex; gap: 8px; align-items: center;">
+            <button id="btn-undo" class="btn btn-sm" title="Undo (Ctrl+Z)" disabled>↶</button>
+            <button id="btn-redo" class="btn btn-sm" title="Redo (Ctrl+Y)" disabled>↷</button>
+            <div style="width: 1px; height: 16px; background: var(--border-color);"></div>
+            <button id="btn-zoom-out" class="btn btn-sm" title="Zoom Out">-</button>
+            <button id="btn-zoom-in" class="btn btn-sm" title="Zoom In">+</button>
+            <button id="btn-zoom-reset" class="btn btn-sm">Reset</button>
+            <div style="width: 1px; height: 16px; background: var(--border-color);"></div>
+            <label class="inspector-checkbox" style="margin: 0; font-size: 11px; color: var(--color-muted); display: flex; align-items: center; gap: 4px; user-select: none;">
+              <input type="checkbox" id="chk-snap" checked /> Snap
+            </label>
+            <div style="width: 1px; height: 16px; background: var(--border-color);"></div>
+            <button id="btn-toggle-editor" class="btn btn-sm" style="background: rgba(6,182,212,0.1); border-color: rgba(6,182,212,0.3); color: var(--primary);">Toggle Code</button>
           </div>
         </div>
-        <div class="canvas-container">
+        <div class="canvas-container" style="cursor: grab;">
           <div class="grid-background"></div>
-          <div id="canvas-preview" class="canvas-preview"></div>
+          <div id="canvas-preview" class="canvas-preview" style="width: 100%; height: 100%; display: block; overflow: hidden; position: relative; padding: 0;"></div>
+        </div>
+      </section>
+
+      <!-- Right Panel: Properties Inspector -->
+      <section class="panel inspector-panel">
+        <div class="panel-header">
+          <h2>Properties</h2>
+        </div>
+        <div id="inspector-content" class="inspector-content">
+          <p class="empty-state">Select a node or connection line to inspect properties</p>
         </div>
       </section>
     </main>
 
     <!-- Error Overlay Footer -->
     <footer id="error-footer" class="error-footer hidden">
+      <button id="btn-close-error" class="btn btn-sm" style="position: absolute; top: 12px; right: 24px; color: var(--color-muted); background: transparent; border: none; font-size: 16px; cursor: pointer;" title="Close">✕</button>
       <div class="error-content">
         <span class="error-icon">⚠️</span>
         <div class="error-message-wrapper">

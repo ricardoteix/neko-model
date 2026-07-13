@@ -203,6 +203,38 @@ const BASE_STYLES = `
     font-size: 14px;
     font-weight: bold;
   }
+
+  /* Interactive Mode Styles */
+  .node-group.interactive {
+    cursor: grab;
+  }
+  .node-group.interactive:active {
+    cursor: grabbing;
+  }
+  .node-group.interactive.selected .chen-entity,
+  .node-group.interactive.selected .chen-weak-entity-outer,
+  .node-group.interactive.selected .chen-relationship,
+  .node-group.interactive.selected .chen-ident-relationship-outer,
+  .node-group.interactive.selected .chen-spec-triangle,
+  .node-group.interactive.selected .chen-attribute,
+  .node-group.interactive.selected .chen-attribute-key,
+  .node-group.interactive.selected .chen-attribute-double-outer,
+  .node-group.interactive.selected .chen-attribute-dashed-ellipse {
+    stroke: #00bcd4 !important;
+    stroke-width: 3px !important;
+  }
+  .node-group.interactive .conn-port {
+    fill: #ffffff;
+    stroke: #00bcd4;
+    stroke-width: 1.5px;
+    opacity: 0;
+    transition: opacity 0.15s ease;
+    cursor: crosshair;
+  }
+  .node-group.interactive:hover .conn-port,
+  .node-group.interactive .conn-port:hover {
+    opacity: 0.8;
+  }
 `;
 
 // Helper to construct custom element style overrides
@@ -246,14 +278,26 @@ export function renderSVG(graph: PositionedGraph, options: RenderOptions = {}): 
 
   // Draw node shapes
   for (const node of graph.nodes.values()) {
-    output += drawNode(node);
+    output += drawNode(node, options.interactive || false);
   }
 
   output += `</svg>`;
   return output;
 }
 
-function drawNode(node: PositionedNode): string {
+function drawInteractivePorts(node: PositionedNode, interactive: boolean): string {
+  if (!interactive || node.type === "attribute") return "";
+  const x = node.x;
+  const y = node.y;
+  const w = node.width;
+  const h = node.height;
+  return `    <circle cx="${x}" cy="${y - h / 2}" r="6" class="conn-port port-top" data-port="top" />
+    <circle cx="${x + w / 2}" cy="${y}" r="6" class="conn-port port-right" data-port="right" />
+    <circle cx="${x}" cy="${y + h / 2}" r="6" class="conn-port port-bottom" data-port="bottom" />
+    <circle cx="${x - w / 2}" cy="${y}" r="6" class="conn-port port-left" data-port="left" />\n`;
+}
+
+function drawNode(node: PositionedNode, interactive: boolean = false): string {
   const x = node.x;
   const y = node.y;
   const w = node.width;
@@ -262,56 +306,59 @@ function drawNode(node: PositionedNode): string {
   const styleAttr = getCustomStyle(node.style, "");
   const textStyleAttr = getTextStyleOverride(node.style);
 
+  const gAttr = `class="node-group${interactive ? " interactive" : ""}" data-id="${node.id}" data-type="${node.type}"`;
+  const ports = drawInteractivePorts(node, interactive);
+
   switch (node.type) {
     case "entity":
-      return `  <g id="node_${node.id}">
+      return `  <g id="node_${node.id}" ${gAttr}>
     <rect x="${x - w / 2}" y="${y - h / 2}" width="${w}" height="${h}" rx="3" class="chen-entity" ${styleAttr} />
     <text x="${x}" y="${y}" class="chen-text chen-entity-text" ${textStyleAttr}>${label}</text>
-  </g>\n`;
-
+    ${ports}  </g>\n`;
+  
     case "weak_entity":
-      return `  <g id="node_${node.id}">
+      return `  <g id="node_${node.id}" ${gAttr}>
     <rect x="${x - w / 2}" y="${y - h / 2}" width="${w}" height="${h}" rx="3" class="chen-weak-entity-outer" ${styleAttr} />
     <rect x="${x - w / 2 + 4}" y="${y - h / 2 + 4}" width="${w - 8}" height="${h - 8}" rx="2" class="chen-weak-entity-inner" ${styleAttr} />
     <text x="${x}" y="${y}" class="chen-text chen-entity-text" ${textStyleAttr}>${label}</text>
-  </g>\n`;
-
+    ${ports}  </g>\n`;
+  
     case "relationship":
       const pStr = `${x},${y - h / 2}  ${x + w / 2},${y}  ${x},${y + h / 2}  ${x - w / 2},${y}`;
-      return `  <g id="node_${node.id}">
+      return `  <g id="node_${node.id}" ${gAttr}>
     <polygon points="${pStr}" class="chen-relationship" ${styleAttr} />
     <text x="${x}" y="${y}" class="chen-text chen-relationship-text" ${textStyleAttr}>${label}</text>
-  </g>\n`;
-
+    ${ports}  </g>\n`;
+  
     case "identifying_relationship":
       const outerP = `${x},${y - h / 2}  ${x + w / 2},${y}  ${x},${y + h / 2}  ${x - w / 2},${y}`;
       const innerP = `${x},${y - h / 2 + 6}  ${x + w / 2 - 6},${y}  ${x},${y + h / 2 - 6}  ${x - w / 2 + 6},${y}`;
-      return `  <g id="node_${node.id}">
+      return `  <g id="node_${node.id}" ${gAttr}>
     <polygon points="${outerP}" class="chen-ident-relationship-outer" ${styleAttr} />
     <polygon points="${innerP}" class="chen-ident-relationship-inner" ${styleAttr} />
     <text x="${x}" y="${y}" class="chen-text chen-relationship-text" ${textStyleAttr}>${label}</text>
-  </g>\n`;
-
+    ${ports}  </g>\n`;
+  
     case "specialization":
       const triPoints = `${x},${y - h / 2}  ${x + w / 2},${y + h / 2}  ${x - w / 2},${y + h / 2}`;
       const p = node.participation === "total" ? "t" : "p";
       const s = node.specializationType === "overlapping" ? "o" : "d";
       const shorthand = `(${p}, ${s})`;
-      return `  <g id="node_${node.id}">
+      return `  <g id="node_${node.id}" ${gAttr}>
     <polygon points="${triPoints}" class="chen-spec-triangle" />
     <text x="${x}" y="${y + 13}" class="chen-text chen-spec-text">${shorthand}</text>
-  </g>\n`;
-
+    ${ports}  </g>\n`;
+  
     case "attribute":
       const rx = w / 2;
       const ry = h / 2;
       const tStyle = node.style?.text ? `style="fill: ${node.style.text};"` : "";
-
+  
       if (node.attributeType === "key") {
-        return `  <g id="node_${node.id}">
+        return `  <g id="node_${node.id}" ${gAttr}>
     <ellipse cx="${x}" cy="${y}" rx="${rx}" ry="${ry}" class="chen-attribute-key" ${styleAttr} />
     <text x="${x}" y="${y}" class="chen-text chen-attribute-key-text" ${textStyleAttr}>${label}</text>
-  </g>\n`;
+    ${ports}  </g>\n`;
       } else if (node.attributeType === "weak_key") {
         // SVG text-decoration does not support dashed underlines easily.
         // We draw an ellipse and standard text, then add a manual dashed line below the text.
@@ -321,29 +368,29 @@ function drawNode(node: PositionedNode): string {
         const lx1 = x - approxWidth / 2;
         const lx2 = x + approxWidth / 2;
         const strokeColor = node.style?.text || "var(--chen-attribute-text)";
-
-        return `  <g id="node_${node.id}">
+  
+        return `  <g id="node_${node.id}" ${gAttr}>
     <ellipse cx="${x}" cy="${y}" rx="${rx}" ry="${ry}" class="chen-attribute" ${styleAttr} />
     <text x="${x}" y="${y}" class="chen-text chen-attribute-text" ${textStyleAttr}>${label}</text>
     <line x1="${lx1}" y1="${ly}" x2="${lx2}" y2="${ly}" stroke="${strokeColor}" stroke-width="1.5" stroke-dasharray="3,2" />
-  </g>\n`;
+    ${ports}  </g>\n`;
       } else if (node.attributeType === "derived") {
-        return `  <g id="node_${node.id}">
+        return `  <g id="node_${node.id}" ${gAttr}>
     <ellipse cx="${x}" cy="${y}" rx="${rx}" ry="${ry}" class="chen-attribute-dashed-ellipse" ${styleAttr} />
     <text x="${x}" y="${y}" class="chen-text chen-attribute-text" ${textStyleAttr}>${label}</text>
-  </g>\n`;
+    ${ports}  </g>\n`;
       } else if (node.attributeType === "multivalued") {
-        return `  <g id="node_${node.id}">
+        return `  <g id="node_${node.id}" ${gAttr}>
     <ellipse cx="${x}" cy="${y}" rx="${rx}" ry="${ry}" class="chen-attribute-double-outer" ${styleAttr} />
     <ellipse cx="${x}" cy="${y}" rx="${rx - 4}" ry="${ry - 4}" class="chen-attribute-double-inner" ${styleAttr} />
     <text x="${x}" y="${y}" class="chen-text chen-attribute-text" ${textStyleAttr}>${label}</text>
-  </g>\n`;
+    ${ports}  </g>\n`;
       } else {
         // Regular Attribute
-        return `  <g id="node_${node.id}">
+        return `  <g id="node_${node.id}" ${gAttr}>
     <ellipse cx="${x}" cy="${y}" rx="${rx}" ry="${ry}" class="chen-attribute" ${styleAttr} />
     <text x="${x}" y="${y}" class="chen-text chen-attribute-text" ${textStyleAttr}>${label}</text>
-  </g>\n`;
+    ${ports}  </g>\n`;
       }
 
     default:
@@ -432,7 +479,7 @@ function drawEdge(edge: PositionedEdge, nodes: Map<string, PositionedNode>): str
     labelStr = `\n    <text x="${lx}" y="${ly}" class="chen-text chen-line-text">${displayLabel}</text>`;
   }
 
-  return `  <g id="edge_${edge.from}_to_${edge.to}">
+  return `  <g id="edge_${edge.from}_to_${edge.to}" class="edge-group" data-from="${edge.from}" data-to="${edge.to}">
 ${linesStr}${labelStr}
   </g>\n`;
 }

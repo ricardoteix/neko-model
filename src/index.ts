@@ -29,4 +29,5 @@ export function render(code: string, options?: LayoutOptions & RenderOptions): s
 export { parseDSL } from "./parser";
 export { layoutDiagram } from "./layout";
 export { renderSVG } from "./renderer";
+export { stringifyAST } from "./serializer";
 export * from "./types";

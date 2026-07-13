@@ -1,0 +1,8 @@
+1. A especificação da cardinalidade não funcionando direto com os valores 1, N, M, (1,1), (1,n), (0,1).
+2. O zoom deve ser controlado pelo scrool do mouse também.
+3. Snap não está funcionando ou está imperceptível. Deve ser possível especificar em drop down quantos pixels de snap.
+4. Adicionar ferramentas de alinhamento vertical e horizontal dos elementos selecionados usando tecla CONTROL.
+5. SPEC não deve ter um valor padrão selecionado para a superclass.
+6. O botão de apagar o atributo que aparece quando selecionamos a entidade está ficando fora da tela.
+7. Deve ter um controle de ajuste do tamanho das áreas de preview e code.
+

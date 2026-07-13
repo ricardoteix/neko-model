@@ -305,7 +305,8 @@ export class Parser {
           isWeak,
           attributes,
           offset: metadata.offset,
-          style: metadata.style
+          style: metadata.style,
+          pos: metadata.pos
         });
       } else if (tok.type === "RELATIONSHIP" || tok.type === "IDENTIFYING_RELATIONSHIP") {
         const isIdentifying = tok.type === "IDENTIFYING_RELATIONSHIP";
@@ -328,12 +329,14 @@ export class Parser {
           isIdentifying,
           attributes,
           offset: metadata.offset,
-          style: metadata.style
+          style: metadata.style,
+          pos: metadata.pos
         });
       } else if (tok.type === "SPECIALIZATION") {
         this.advance(); // consume keyword
         
         const idTok = this.match("IDENTIFIER");
+        const metadata = this.parseBracketMetadata();
         this.match("BRACE_OPEN");
 
         let type: "disjoint" | "overlapping" = "disjoint";
@@ -376,7 +379,8 @@ export class Parser {
           type,
           participation,
           superclass,
-          subclasses
+          subclasses,
+          pos: metadata.pos
         });
       } else if (tok.type === "IDENTIFIER") {
         // Connection statement: Source ID LinkOperator Target ID
@@ -416,7 +420,7 @@ export class Parser {
           participation,
           role,
           labelOffset: metadata.offset,
-          style: metadata.style ? { stroke: metadata.style.stroke } : null,
+          style: metadata.style ? { stroke: metadata.style.stroke, strokeWidth: metadata.style.strokeWidth } : null,
           dir: (metadata.dir === "left" || metadata.dir === "right" || metadata.dir === "up" || metadata.dir === "down") ? metadata.dir : null
         });
       } else {
@@ -503,10 +507,16 @@ export class Parser {
     };
   }
 
-  private parseBracketMetadata(): { offset: [number, number] | null; style: StyleOverride | null; dir: string | null } {
+  private parseBracketMetadata(): { 
+    offset: [number, number] | null; 
+    style: StyleOverride | null; 
+    dir: string | null;
+    pos: { x: number; y: number } | null;
+  } {
     let offset: [number, number] | null = null;
     let style: StyleOverride | null = null;
     let dir: string | null = null;
+    let pos: { x: number; y: number } | null = null;
 
     if (this.peek().type === "BRACKET_OPEN") {
       this.advance(); // consume '['
@@ -521,6 +531,11 @@ export class Parser {
           this.match("COMMA");
           const yTok = this.match("NUMBER");
           offset = [parseFloat(xTok.value), parseFloat(yTok.value)];
+        } else if (keyTok.value === "pos") {
+          const xTok = this.match("NUMBER");
+          this.match("COMMA");
+          const yTok = this.match("NUMBER");
+          pos = { x: parseFloat(xTok.value), y: parseFloat(yTok.value) };
         } else if (keyTok.value === "dir") {
           let val = "";
           if (this.peek().type === "STRING") {
@@ -529,16 +544,19 @@ export class Parser {
             val = this.match("IDENTIFIER").value;
           }
           dir = val;
-        } else if (keyTok.value === "fill" || keyTok.value === "stroke" || keyTok.value === "text") {
+        } else if (keyTok.value === "fill" || keyTok.value === "stroke" || keyTok.value === "text" || keyTok.value === "strokeWidth") {
           if (!style) style = {};
           
-          let val = "";
-          if (this.peek().type === "STRING") {
+          let val: any = "";
+          if (keyTok.value === "strokeWidth") {
+            const numTok = this.match("NUMBER");
+            val = parseFloat(numTok.value);
+          } else if (this.peek().type === "STRING") {
             val = this.advance().value;
           } else {
             val = this.match("IDENTIFIER").value;
           }
-          style[keyTok.value as keyof StyleOverride] = val;
+          style[keyTok.value as keyof StyleOverride] = val as any;
         } else {
           // Allow unknown metadata to be ignored silently
           this.advance();
@@ -552,7 +570,7 @@ export class Parser {
       this.match("BRACKET_CLOSE");
     }
 
-    return { offset, style, dir };
+    return { offset, style, dir, pos };
   }
 }
 

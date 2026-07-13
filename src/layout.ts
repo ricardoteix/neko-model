@@ -77,8 +77,8 @@ export class DagreRadialLayoutEngine implements LayoutEngine {
     // Store Entities
     for (const ent of ast.entities) {
       const dNode = g.node(ent.id);
-      const x = dNode.x;
-      const y = dNode.y;
+      const x = ent.pos ? ent.pos.x : dNode.x;
+      const y = ent.pos ? ent.pos.y : dNode.y;
       nodes.set(ent.id, {
         id: ent.id,
         type: ent.isWeak ? "weak_entity" : "entity",
@@ -96,8 +96,8 @@ export class DagreRadialLayoutEngine implements LayoutEngine {
     // Store Relationships
     for (const rel of ast.relationships) {
       const dNode = g.node(rel.id);
-      const x = dNode.x;
-      const y = dNode.y;
+      const x = rel.pos ? rel.pos.x : dNode.x;
+      const y = rel.pos ? rel.pos.y : dNode.y;
       nodes.set(rel.id, {
         id: rel.id,
         type: rel.isIdentifying ? "identifying_relationship" : "relationship",
@@ -115,8 +115,8 @@ export class DagreRadialLayoutEngine implements LayoutEngine {
     // Store Specializations
     for (const spec of ast.specializations) {
       const dNode = g.node(spec.id);
-      const x = dNode.x;
-      const y = dNode.y;
+      const x = spec.pos ? spec.pos.x : dNode.x;
+      const y = spec.pos ? spec.pos.y : dNode.y;
       const label = spec.type === "disjoint" ? "d" : "o";
       nodes.set(spec.id, {
         id: spec.id,
@@ -295,6 +295,14 @@ export class DagreRadialLayoutEngine implements LayoutEngine {
     for (const comp of components) {
       const compSet = new Set(comp);
 
+      // Check if this component has any manual position overrides
+      const hasManualPos = comp.some(id => {
+        const ent = ast.entities.find(e => e.id === id);
+        const rel = ast.relationships.find(r => r.id === id);
+        const spec = ast.specializations.find(s => s.id === id);
+        return (ent && ent.pos) || (rel && rel.pos) || (spec && spec.pos);
+      });
+
       // Apply relative connection directions (dir metadata) locally
       for (const conn of ast.connections) {
         if (conn.dir && compSet.has(conn.from) && compSet.has(conn.to)) {
@@ -376,7 +384,9 @@ export class DagreRadialLayoutEngine implements LayoutEngine {
         }
       };
 
-      resolveLocalOverlaps();
+      if (!hasManualPos) {
+        resolveLocalOverlaps();
+      }
     }
 
     // Position sorted components side-by-side
@@ -395,17 +405,29 @@ export class DagreRadialLayoutEngine implements LayoutEngine {
         compMaxX = Math.max(compMaxX, n.x + n.width / 2);
       }
 
-      // Calculate shift to align compMinX to currentXOffset
-      const dx = currentXOffset - compMinX;
-      if (dx !== 0) {
-        for (const id of comp) {
-          const n = nodes.get(id)!;
-          n.x += dx;
+      // Check if this component has any manual position overrides
+      const hasManualPos = comp.some(id => {
+        const ent = ast.entities.find(e => e.id === id);
+        const rel = ast.relationships.find(r => r.id === id);
+        const spec = ast.specializations.find(s => s.id === id);
+        return (ent && ent.pos) || (rel && rel.pos) || (spec && spec.pos);
+      });
+
+      if (!hasManualPos) {
+        // Calculate shift to align compMinX to currentXOffset
+        const dx = currentXOffset - compMinX;
+        if (dx !== 0) {
+          for (const id of comp) {
+            const n = nodes.get(id)!;
+            n.x += dx;
+          }
         }
+        compMinX += dx;
+        compMaxX += dx;
       }
 
-      // Advance offset to the right
-      currentXOffset += (compMaxX - compMinX) + componentSpacing;
+      // Advance offset to the right of this component
+      currentXOffset = compMaxX + componentSpacing;
     }
 
     // 2. Radial Satellite Placement for Attributes
@@ -718,10 +740,22 @@ export class DagreRadialLayoutEngine implements LayoutEngine {
 
     // Normalize all coordinates so they fit snugly in a positive viewport
     const padding = 60;
-    const offsetX = minX === Infinity ? 0 : -minX + padding;
-    const offsetY = minY === Infinity ? 0 : -minY + padding;
-    const width = minX === Infinity ? 800 : maxX - minX + 2 * padding;
-    const height = minY === Infinity ? 600 : maxY - minY + 2 * padding;
+    
+    const hasAnyManualPos = Array.from(nodes.values()).some(n => {
+      const ent = ast.entities.find(e => e.id === n.id);
+      const rel = ast.relationships.find(r => r.id === n.id);
+      const spec = ast.specializations.find(s => s.id === n.id);
+      return (ent && ent.pos) || (rel && rel.pos) || (spec && spec.pos);
+    });
+
+    const offsetX = hasAnyManualPos ? 0 : (minX === Infinity ? 0 : -minX + padding);
+    const offsetY = hasAnyManualPos ? 0 : (minY === Infinity ? 0 : -minY + padding);
+    const width = hasAnyManualPos
+      ? (maxX === -Infinity ? 800 : maxX + padding * 2)
+      : (minX === Infinity ? 800 : maxX - minX + 2 * padding);
+    const height = hasAnyManualPos
+      ? (maxY === -Infinity ? 600 : maxY + padding * 2)
+      : (minY === Infinity ? 600 : maxY - minY + 2 * padding);
 
     // Shift nodes
     for (const node of nodes.values()) {

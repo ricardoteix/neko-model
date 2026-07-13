@@ -2,6 +2,7 @@ export interface StyleOverride {
   fill?: string;
   stroke?: string;
   text?: string;
+  strokeWidth?: number;
 }
 
 export interface Attribute {
@@ -22,6 +23,7 @@ export interface Entity {
   attributes: Attribute[];
   offset: [number, number] | null;
   style: StyleOverride | null;
+  pos?: { x: number; y: number } | null;
 }
 
 export interface Relationship {
@@ -30,6 +32,7 @@ export interface Relationship {
   attributes: Attribute[];
   offset: [number, number] | null;
   style: StyleOverride | null;
+  pos?: { x: number; y: number } | null;
 }
 
 export interface Specialization {
@@ -38,6 +41,7 @@ export interface Specialization {
   participation: "partial" | "total";
   superclass: string;
   subclasses: string[];
+  pos?: { x: number; y: number } | null;
 }
 
 export interface Connection {
