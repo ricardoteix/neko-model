@@ -13,9 +13,13 @@ document.addEventListener("DOMContentLoaded", () => {
   const btnZoomOut = document.getElementById("btn-zoom-out") as HTMLButtonElement;
   const btnZoomReset = document.getElementById("btn-zoom-reset") as HTMLButtonElement;
   
+  const btnAlignH = document.getElementById("btn-align-h") as HTMLButtonElement;
+  const btnAlignV = document.getElementById("btn-align-v") as HTMLButtonElement;
+  
   const btnUndo = document.getElementById("btn-undo") as HTMLButtonElement;
   const btnRedo = document.getElementById("btn-redo") as HTMLButtonElement;
   const chkSnap = document.getElementById("chk-snap") as HTMLInputElement;
+  const selectSnapSize = document.getElementById("select-snap-size") as HTMLSelectElement;
   
   const btnToggleEditor = document.getElementById("btn-toggle-editor") as HTMLButtonElement;
   const editorPanel = document.getElementById("editor-panel") as HTMLElement;
@@ -42,8 +46,31 @@ document.addEventListener("DOMContentLoaded", () => {
   let activeTool = "select";
   let selectedId: string | null = null;
   let selectedType: string | null = null;
+  const selectedIds = new Set<string>();
   let selectedEdge: { from: string; to: string } | null = null;
   let parsedAST: any = null;
+
+  interface DraggedLine {
+    element: SVGLineElement;
+    isFrom: boolean;
+    x1: number;
+    y1: number;
+    x2: number;
+    y2: number;
+  }
+  interface DraggedText {
+    element: SVGTextElement;
+    x: number;
+    y: number;
+    isFrom: boolean;
+    oppositeX: number;
+    oppositeY: number;
+    pushX: number;
+    pushY: number;
+  }
+
+  let draggedLines: DraggedLine[] = [];
+  let draggedTexts: DraggedText[] = [];
 
   // Drag-and-Drop Variables
   let isDragging = false;
@@ -60,7 +87,7 @@ document.addEventListener("DOMContentLoaded", () => {
   let linkSourceId = "";
   let guideLine: SVGLineElement | null = null;
 
-  const gridSize = 20;
+  let gridSize = 20;
 
   // 1. Undo/Redo state recorders
   function recordState() {
@@ -207,8 +234,30 @@ document.addEventListener("DOMContentLoaded", () => {
     debounceTimer = setTimeout(compileDiagram, 250);
   });
 
-  themeSelect.addEventListener("change", () => compileDiagram());
+  function updateBodyThemeClass() {
+    const val = themeSelect.value;
+    document.body.classList.remove("dark", "forest", "neutral");
+    if (val !== "default") {
+      document.body.classList.add(val);
+    }
+  }
+
+  themeSelect.addEventListener("change", () => {
+    updateBodyThemeClass();
+    compileDiagram();
+  });
+  updateBodyThemeClass();
   spacingSelect.addEventListener("change", () => compileDiagram());
+
+  if (selectSnapSize) {
+    selectSnapSize.addEventListener("change", () => {
+      gridSize = parseInt(selectSnapSize.value) || 20;
+      const gridBg = document.querySelector(".grid-background") as HTMLElement;
+      if (gridBg) {
+        gridBg.style.backgroundSize = `${gridSize}px ${gridSize}px`;
+      }
+    });
+  }
 
   // Close/Minimize Error overlay panel
   if (btnCloseError) {
@@ -265,34 +314,36 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     if (e.key === "Delete" || e.key === "Backspace") {
-      if (selectedId && selectedType) {
+      if (selectedIds.size > 0) {
         recordState();
-        if (selectedType === "entity" || selectedType === "weak_entity") {
-          parsedAST.entities = parsedAST.entities.filter((x: any) => x.id !== selectedId);
-          parsedAST.connections = parsedAST.connections.filter((c: any) => c.from !== selectedId && c.to !== selectedId);
-          parsedAST.specializations = parsedAST.specializations.filter((s: any) => s.superclass !== selectedId && !s.subclasses.includes(selectedId));
-        } else if (selectedType === "relationship" || selectedType === "identifying_relationship") {
-          parsedAST.relationships = parsedAST.relationships.filter((x: any) => x.id !== selectedId);
-          parsedAST.connections = parsedAST.connections.filter((c: any) => c.from !== selectedId && c.to !== selectedId);
-        } else if (selectedType === "specialization") {
-          parsedAST.specializations = parsedAST.specializations.filter((s: any) => s.id !== selectedId);
-          parsedAST.connections = parsedAST.connections.filter((c: any) => c.from !== selectedId && c.to !== selectedId);
-        } else if (selectedType === "attribute") {
-          let parentId = "";
-          let attrId = "";
-          if (selectedId.includes("_attr_")) {
-            const parts = selectedId.split("_attr_");
-            parentId = parts[0];
-            attrId = parts[1];
-          }
-          if (parentId && attrId) {
-            const parent = parsedAST.entities.find((x: any) => x.id === parentId) || 
-                           parsedAST.relationships.find((x: any) => x.id === parentId);
-            if (parent) {
-              parent.attributes = parent.attributes.filter((a: any) => a.id !== attrId);
+        selectedIds.forEach(id => {
+          const ent = parsedAST.entities.find((x: any) => x.id === id);
+          const rel = parsedAST.relationships.find((x: any) => x.id === id);
+          const spec = parsedAST.specializations.find((x: any) => x.id === id);
+          
+          if (ent) {
+            parsedAST.entities = parsedAST.entities.filter((x: any) => x.id !== id);
+            parsedAST.connections = parsedAST.connections.filter((c: any) => c.from !== id && c.to !== id);
+            parsedAST.specializations = parsedAST.specializations.filter((s: any) => s.superclass !== id && !s.subclasses.includes(id));
+          } else if (rel) {
+            parsedAST.relationships = parsedAST.relationships.filter((x: any) => x.id !== id);
+            parsedAST.connections = parsedAST.connections.filter((c: any) => c.from !== id && c.to !== id);
+          } else if (spec) {
+            parsedAST.specializations = parsedAST.specializations.filter((s: any) => s.id !== id);
+            parsedAST.connections = parsedAST.connections.filter((c: any) => c.from !== id && c.to !== id);
+          } else {
+            if (id.includes("_attr_")) {
+              const parts = id.split("_attr_");
+              const parentId = parts[0];
+              const attrId = parts[1];
+              const parent = parsedAST.entities.find((x: any) => x.id === parentId) || 
+                             parsedAST.relationships.find((x: any) => x.id === parentId);
+              if (parent) {
+                parent.attributes = parent.attributes.filter((a: any) => a.id !== attrId);
+              }
             }
           }
-        }
+        });
         clearSelection();
         serializeAndSync();
         e.preventDefault();
@@ -311,6 +362,7 @@ document.addEventListener("DOMContentLoaded", () => {
     selectedId = null;
     selectedType = null;
     selectedEdge = null;
+    selectedIds.clear();
     updateVisualSelection();
     renderInspector();
   }
@@ -321,7 +373,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     svgEl.querySelectorAll(".node-group").forEach(g => {
       const id = g.getAttribute("data-id");
-      if (id === selectedId) {
+      if (id && selectedIds.has(id)) {
         g.classList.add("selected");
       } else {
         g.classList.remove("selected");
@@ -333,7 +385,7 @@ document.addEventListener("DOMContentLoaded", () => {
       const to = g.getAttribute("data-to");
       if (selectedEdge && selectedEdge.from === from && selectedEdge.to === to) {
         g.querySelectorAll("line").forEach(l => {
-          l.style.stroke = "#00bcd4";
+          l.style.stroke = "#FF5A43";
           l.style.strokeWidth = "3px";
         });
       } else {
@@ -343,6 +395,94 @@ document.addEventListener("DOMContentLoaded", () => {
         });
       }
     });
+  }
+
+  // Store initial coordinates of lines and labels connected to the dragged node
+  function storeInitialConnectedLineCoordinates(nodeId: string) {
+    draggedLines = [];
+    draggedTexts = [];
+    
+    const svgEl = preview.querySelector("svg");
+    if (!svgEl) return;
+
+    const edges = svgEl.querySelectorAll(`.edge-group[data-from="${nodeId}"], .edge-group[data-to="${nodeId}"]`);
+    
+    edges.forEach(edgeGroup => {
+      const from = edgeGroup.getAttribute("data-from") || "";
+      const to = edgeGroup.getAttribute("data-to") || "";
+      const isFrom = (from === nodeId);
+      const oppositeId = isFrom ? to : from;
+      
+      const oppositeNode = svgEl.querySelector(`.node-group[data-id="${oppositeId}"]`);
+      let oppositeX = 0;
+      let oppositeY = 0;
+      if (oppositeNode) {
+        const transform = oppositeNode.getAttribute("transform") || "";
+        const match = transform.match(/translate\(([-\d.]+),\s*([-\d.]+)\)/);
+        if (match) {
+          oppositeX = parseFloat(match[1]);
+          oppositeY = parseFloat(match[2]);
+        }
+      }
+      
+      edgeGroup.querySelectorAll("line").forEach((line: SVGLineElement) => {
+        draggedLines.push({
+          element: line,
+          isFrom,
+          x1: parseFloat(line.getAttribute("x1") || "0"),
+          y1: parseFloat(line.getAttribute("y1") || "0"),
+          x2: parseFloat(line.getAttribute("x2") || "0"),
+          y2: parseFloat(line.getAttribute("y2") || "0")
+        });
+      });
+      
+      edgeGroup.querySelectorAll("text").forEach((text: SVGTextElement) => {
+        const x = parseFloat(text.getAttribute("x") || "0");
+        const y = parseFloat(text.getAttribute("y") || "0");
+        
+        const line = edgeGroup.querySelector("line");
+        if (line) {
+          const lx1 = parseFloat(line.getAttribute("x1") || "0");
+          const ly1 = parseFloat(line.getAttribute("y1") || "0");
+          const lx2 = parseFloat(line.getAttribute("x2") || "0");
+          const ly2 = parseFloat(line.getAttribute("y2") || "0");
+          
+          const mx = (lx1 + lx2) / 2;
+          const my = (ly1 + ly2) / 2;
+          
+          draggedTexts.push({
+            element: text,
+            x,
+            y,
+            isFrom,
+            oppositeX,
+            oppositeY,
+            pushX: x - mx,
+            pushY: y - my
+          });
+        }
+      });
+    });
+  }
+
+  // Update line and label positions during mousemove drag
+  function updateConnectedLinesDuringDrag(dx: number, dy: number) {
+    for (const dl of draggedLines) {
+      if (dl.isFrom) {
+        dl.element.setAttribute("x1", (dl.x1 + dx).toString());
+        dl.element.setAttribute("y1", (dl.y1 + dy).toString());
+      } else {
+        dl.element.setAttribute("x2", (dl.x2 + dx).toString());
+        dl.element.setAttribute("y2", (dl.y2 + dy).toString());
+      }
+    }
+    
+    for (const dt of draggedTexts) {
+      const newX = dt.x + dx / 2;
+      const newY = dt.y + dy / 2;
+      dt.element.setAttribute("x", newX.toString());
+      dt.element.setAttribute("y", newY.toString());
+    }
   }
 
   // SVG coordinate transformation accounting for zoom and pan levels
@@ -399,12 +539,11 @@ document.addEventListener("DOMContentLoaded", () => {
             pos: { x: finalX, y: finalY }
           });
         } else if (activeTool === "specialization") {
-          const firstEnt = parsedAST.entities[0]?.id || "";
           parsedAST.specializations.push({
             id: `Spec_${uniqueNum}`,
             type: "disjoint",
             participation: "total",
-            superclass: firstEnt,
+            superclass: "",
             subclasses: [],
             pos: { x: finalX, y: finalY }
           });
@@ -459,8 +598,36 @@ document.addEventListener("DOMContentLoaded", () => {
 
         // Selection & Dragging initialization
         if (activeTool === "select") {
-          selectedId = id;
-          selectedType = type;
+          const isCtrl = e.ctrlKey || e.metaKey;
+          if (isCtrl) {
+            if (selectedIds.has(id)) {
+              selectedIds.delete(id);
+              if (selectedId === id) {
+                if (selectedIds.size > 0) {
+                  selectedId = Array.from(selectedIds)[selectedIds.size - 1];
+                  const ent = parsedAST.entities.find((x: any) => x.id === selectedId);
+                  const rel = parsedAST.relationships.find((x: any) => x.id === selectedId);
+                  const spec = parsedAST.specializations.find((x: any) => x.id === selectedId);
+                  if (ent) selectedType = "entity";
+                  else if (rel) selectedType = "relationship";
+                  else if (spec) selectedType = "specialization";
+                  else selectedType = selectedId.includes("_attr_") ? "attribute" : null;
+                } else {
+                  selectedId = null;
+                  selectedType = null;
+                }
+              }
+            } else {
+              selectedIds.add(id);
+              selectedId = id;
+              selectedType = type;
+            }
+          } else {
+            selectedIds.clear();
+            selectedIds.add(id);
+            selectedId = id;
+            selectedType = type;
+          }
           selectedEdge = null;
           updateVisualSelection();
           renderInspector();
@@ -473,6 +640,7 @@ document.addEventListener("DOMContentLoaded", () => {
           dragStartY = e.clientY;
           currentDx = 0;
           currentDy = 0;
+          storeInitialConnectedLineCoordinates(id);
         } else if (activeTool === "attribute" && type !== "attribute" && type !== "specialization") {
           // Add attribute tool click on parent
           recordState();
@@ -517,9 +685,26 @@ document.addEventListener("DOMContentLoaded", () => {
   // Global mouse move Listener for drag translations and link guide lines
   window.addEventListener("mousemove", (e: MouseEvent) => {
     if (isDragging && dragGroup) {
-      currentDx = (e.clientX - dragStartX) / currentZoom;
-      currentDy = (e.clientY - dragStartY) / currentZoom;
+      const rawDx = (e.clientX - dragStartX) / currentZoom;
+      const rawDy = (e.clientY - dragStartY) / currentZoom;
+      
+      const graph = layoutDiagram(parsedAST);
+      const positioned = graph.nodes.get(dragId);
+      if (positioned) {
+        const rawX = positioned.x + rawDx;
+        const rawY = positioned.y + rawDy;
+        const snappedX = snapVal(rawX);
+        const snappedY = snapVal(rawY);
+        
+        currentDx = snappedX - positioned.x;
+        currentDy = snappedY - positioned.y;
+      } else {
+        currentDx = snapVal(rawDx);
+        currentDy = snapVal(rawDy);
+      }
+      
       dragGroup.setAttribute("transform", `translate(${currentDx}, ${currentDy})`);
+      updateConnectedLinesDuringDrag(currentDx, currentDy);
     }
     
     if (isDrawingLink && guideLine) {
@@ -861,10 +1046,15 @@ document.addEventListener("DOMContentLoaded", () => {
         if (!spec) return;
 
         // Superclass list dropdown
-        const superclassOptions = parsedAST.entities.map((ent: any) => {
-          const isSelected = ent.id === spec.superclass ? "selected" : "";
-          return `<option value="${ent.id}" ${isSelected}>${ent.id}</option>`;
-        }).join("");
+        const hasSuperclass = !!spec.superclass;
+        const emptySelected = !hasSuperclass ? "selected" : "";
+        const superclassOptions = `
+          <option value="" ${emptySelected}>-- None --</option>
+          ${parsedAST.entities.map((ent: any) => {
+            const isSelected = ent.id === spec.superclass ? "selected" : "";
+            return `<option value="${ent.id}" ${isSelected}>${ent.id}</option>`;
+          }).join("")}
+        `;
 
         // Subclass checkboxes
         const subclassChecklist = parsedAST.entities.map((ent: any) => {
@@ -1192,18 +1382,16 @@ document.addEventListener("DOMContentLoaded", () => {
     applyTransform();
   });
 
-  // Mouse wheel zoom listener (Ctrl + Wheel)
+  // Mouse wheel zoom listener (Direct Scroll Zoom)
   preview.addEventListener("wheel", (e) => {
-    if (e.ctrlKey) {
-      e.preventDefault();
-      const zoomFactor = 0.08;
-      if (e.deltaY < 0) {
-        currentZoom = Math.min(2.5, currentZoom + zoomFactor);
-      } else {
-        currentZoom = Math.max(0.5, currentZoom - zoomFactor);
-      }
-      applyTransform();
+    e.preventDefault();
+    const zoomFactor = 0.08;
+    if (e.deltaY < 0) {
+      currentZoom = Math.min(2.5, currentZoom + zoomFactor);
+    } else {
+      currentZoom = Math.max(0.5, currentZoom - zoomFactor);
     }
+    applyTransform();
   }, { passive: false });
 
   // Copy code to clipboard
@@ -1242,6 +1430,88 @@ document.addEventListener("DOMContentLoaded", () => {
       alert("Failed to export SVG: " + err.message);
     }
   });
+
+  // Draggable Splitter Handle logic
+  // Alignment logic for selected nodes
+  function alignSelectedNodes(direction: "horizontal" | "vertical") {
+    if (selectedIds.size < 2 || !parsedAST) return;
+
+    recordState();
+
+    const graph = layoutDiagram(parsedAST);
+    const selectedList = Array.from(selectedIds);
+    const referenceNodeId = selectedList[0];
+    const referencePos = graph.nodes.get(referenceNodeId);
+    if (!referencePos) return;
+
+    const alignValue = direction === "horizontal" ? referencePos.y : referencePos.x;
+
+    selectedList.forEach(id => {
+      const currentPos = graph.nodes.get(id);
+      if (!currentPos) return;
+
+      const ent = parsedAST.entities.find((n: any) => n.id === id);
+      if (ent) {
+        if (!ent.pos) ent.pos = { x: currentPos.x, y: currentPos.y };
+        if (direction === "horizontal") ent.pos.y = snapVal(alignValue);
+        else ent.pos.x = snapVal(alignValue);
+      }
+
+      const rel = parsedAST.relationships.find((n: any) => n.id === id);
+      if (rel) {
+        if (!rel.pos) rel.pos = { x: currentPos.x, y: currentPos.y };
+        if (direction === "horizontal") rel.pos.y = snapVal(alignValue);
+        else rel.pos.x = snapVal(alignValue);
+      }
+
+      const spec = parsedAST.specializations.find((n: any) => n.id === id);
+      if (spec) {
+        if (!spec.pos) spec.pos = { x: currentPos.x, y: currentPos.y };
+        if (direction === "horizontal") spec.pos.y = snapVal(alignValue);
+        else spec.pos.x = snapVal(alignValue);
+      }
+    });
+
+    serializeAndSync();
+  }
+
+  if (btnAlignH) {
+    btnAlignH.addEventListener("click", () => alignSelectedNodes("horizontal"));
+  }
+  if (btnAlignV) {
+    btnAlignV.addEventListener("click", () => alignSelectedNodes("vertical"));
+  }
+
+  const splitter = document.getElementById("workspace-splitter") as HTMLDivElement;
+  if (splitter && editorPanel) {
+    let isSplitterDragging = false;
+    
+    splitter.addEventListener("mousedown", (e) => {
+      isSplitterDragging = true;
+      splitter.classList.add("dragging");
+      document.body.style.cursor = "col-resize";
+      e.preventDefault();
+    });
+
+    window.addEventListener("mousemove", (e) => {
+      if (!isSplitterDragging) return;
+      const workspace = document.querySelector(".workspace") as HTMLElement;
+      if (workspace) {
+        const rect = workspace.getBoundingClientRect();
+        const offsetLeft = e.clientX - rect.left;
+        const newWidth = Math.max(200, Math.min(800, offsetLeft));
+        editorPanel.style.flex = `0 0 ${newWidth}px`;
+      }
+    });
+
+    window.addEventListener("mouseup", () => {
+      if (isSplitterDragging) {
+        isSplitterDragging = false;
+        splitter.classList.remove("dragging");
+        document.body.style.cursor = "";
+      }
+    });
+  }
 
   // Initial compile run
   compileDiagram();

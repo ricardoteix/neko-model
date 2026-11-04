@@ -14,3 +14,5 @@ scratch/
 .DS_Store
 Thumbs.db
 *.log
+
+assets/neko-model-logo.png

@@ -1,5 +1,5 @@
 {
-  "name": "chen-er-renderer",
+  "name": "neko-model",
   "version": "1.0.0",
   "description": "Standalone Chen ER Diagram DSL Parser and SVG Renderer",
   "type": "module",

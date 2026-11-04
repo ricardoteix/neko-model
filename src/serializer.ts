@@ -119,9 +119,10 @@ export function stringifyAST(ast: ChenAST): string {
     const op = conn.participation === "total" ? "==" : "--";
     let decl = `${conn.from} ${op} ${conn.to}`;
     
-    if (conn.cardinality || conn.role) {
-      const label = conn.cardinality || conn.role;
-      decl += ` : "${label}"`;
+    if (conn.cardinality) {
+      decl += ` : ${conn.cardinality}`;
+    } else if (conn.role) {
+      decl += ` : "${conn.role}"`;
     }
     
     decl += stringifyBracketMetadata(conn.labelOffset, conn.style, conn.dir || null, null);

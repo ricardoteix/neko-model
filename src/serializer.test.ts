@@ -90,4 +90,22 @@ Employee == Job [stroke: "#000", strokeWidth: 2]`;
     expect(ast2.connections[0].participation).toBe("total");
     expect(ast2.connections[0].style?.strokeWidth).toBe(2);
   });
+
+  test("Should serialize cardinalities without quotes and roles with quotes", () => {
+    const dsl = `chenER
+entity Customer
+relationship Places
+Customer -- Places : 1 [dir: right]
+Places == Customer : "manages"`;
+
+    const ast = parseDSL(dsl);
+    const serialized = stringifyAST(ast);
+
+    expect(serialized).toContain("Customer -- Places : 1 [dir: right]");
+    expect(serialized).toContain('Places == Customer : "manages"');
+
+    const ast2 = parseDSL(serialized);
+    expect(ast2.connections[0].cardinality).toBe("1");
+    expect(ast2.connections[1].role).toBe("manages");
+  });
 });

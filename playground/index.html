@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Chen ER - Conceptual Diagram Playground</title>
+  <title>Neko Model - Conceptual Database Modeling</title>
   <!-- Google Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -15,15 +15,15 @@
     <!-- Header -->
     <header class="app-header">
       <div class="logo-section">
-        <span class="glowing-orb"></span>
-        <h1>Chen ER <span class="badge">Playground</span></h1>
+        <img src="./assets/neko-model-icon.png" alt="Neko Model Logo" class="brand-icon" />
+        <h1>Neko Model <span class="badge">Playground</span></h1>
       </div>
       <div class="controls-section">
         <div class="select-wrapper">
           <label for="theme-select">Theme:</label>
           <select id="theme-select">
-            <option value="default">Default (Light)</option>
-            <option value="dark" selected>Dark Mode</option>
+            <option value="default" selected>Default (Light)</option>
+            <option value="dark">Dark Mode</option>
             <option value="forest">Forest Green</option>
             <option value="neutral">Neutral (B&W)</option>
           </select>
@@ -132,6 +132,9 @@ entity Technician</textarea>
         </div>
       </section>
 
+      <!-- Draggable Splitter Handle -->
+      <div id="workspace-splitter" class="workspace-splitter"></div>
+
       <!-- Center Panel: SVG Visualizer -->
       <section class="panel visualizer-panel">
         <div class="panel-header">
@@ -144,9 +147,20 @@ entity Technician</textarea>
             <button id="btn-zoom-in" class="btn btn-sm" title="Zoom In">+</button>
             <button id="btn-zoom-reset" class="btn btn-sm">Reset</button>
             <div style="width: 1px; height: 16px; background: var(--border-color);"></div>
+            <button id="btn-align-h" class="btn btn-sm" title="Align Horizontally" style="font-size: 10px; padding: 2px 6px;">Align H</button>
+            <button id="btn-align-v" class="btn btn-sm" title="Align Vertically" style="font-size: 10px; padding: 2px 6px;">Align V</button>
+            <div style="width: 1px; height: 16px; background: var(--border-color);"></div>
             <label class="inspector-checkbox" style="margin: 0; font-size: 11px; color: var(--color-muted); display: flex; align-items: center; gap: 4px; user-select: none;">
               <input type="checkbox" id="chk-snap" checked /> Snap
             </label>
+            <div class="select-wrapper" style="margin: 0 4px; font-size: 11px;">
+              <select id="select-snap-size" style="padding: 2px 6px; font-size: 11px; height: auto;">
+                <option value="5">5px</option>
+                <option value="10">10px</option>
+                <option value="20" selected>20px</option>
+                <option value="40">40px</option>
+              </select>
+            </div>
             <div style="width: 1px; height: 16px; background: var(--border-color);"></div>
             <button id="btn-toggle-editor" class="btn btn-sm" style="background: rgba(6,182,212,0.1); border-color: rgba(6,182,212,0.3); color: var(--primary);">Toggle Code</button>
           </div>

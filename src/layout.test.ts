@@ -495,4 +495,23 @@ describe("Chen ER Layout Manager Tests", () => {
     expect(places.x).toBe(340);
     expect(places.y).toBe(480);
   });
+
+  test("Should layout successfully when a specialization has an empty or unset superclass", () => {
+    const dsl = `
+      chenER
+      specialization EmployeeType {
+        type: disjoint
+        participation: total
+        subclasses: Manager
+      }
+      entity Manager
+    `;
+
+    const ast = parseDSL(dsl);
+    expect(() => layoutDiagram(ast)).not.toThrow();
+
+    const graph = layoutDiagram(ast);
+    expect(graph.nodes.has("EmployeeType")).toBe(true);
+    expect(graph.nodes.has("Manager")).toBe(true);
+  });
 });

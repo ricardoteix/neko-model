@@ -51,7 +51,9 @@ export class DagreRadialLayoutEngine implements LayoutEngine {
     }
 
     for (const spec of ast.specializations) {
-      g.setEdge(spec.superclass, spec.id);
+      if (spec.superclass) {
+        g.setEdge(spec.superclass, spec.id);
+      }
       for (const sub of spec.subclasses) {
         g.setEdge(spec.id, sub);
       }

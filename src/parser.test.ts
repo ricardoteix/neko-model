@@ -187,4 +187,21 @@ describe("Chen ER DSL Parser Tests", () => {
       expect(e.col).toBe(18); // columns around the colon
     }
   });
+
+  test("Should parse direct (unquoted) cardinalities", () => {
+    const dsl = `
+      chenER
+      Customer -- Places : 1
+      Places == Order : N
+      Order == Has : (1,1)
+      Has == Item : (0,N)
+    `;
+
+    const ast = parseDSL(dsl);
+    expect(ast.connections).toHaveLength(4);
+    expect(ast.connections[0].cardinality).toBe("1");
+    expect(ast.connections[1].cardinality).toBe("N");
+    expect(ast.connections[2].cardinality).toBe("(1,1)");
+    expect(ast.connections[3].cardinality).toBe("(0,N)");
+  });
 });

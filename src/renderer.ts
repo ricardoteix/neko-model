@@ -30,15 +30,15 @@ const THEMES: Record<string, string> = {
     :root {
       --chen-bg: #121212;
       --chen-entity-fill: #1e1e1e;
-      --chen-entity-stroke: #00e5ff;
+      --chen-entity-stroke: #FF5A43;
       --chen-entity-text: #e0f7fa;
       --chen-weak-entity-fill: #1e1e1e;
-      --chen-weak-entity-stroke: #00e5ff;
+      --chen-weak-entity-stroke: #FF5A43;
       --chen-relationship-fill: #1e1e1e;
-      --chen-relationship-stroke: #ff007f;
+      --chen-relationship-stroke: #ffa090;
       --chen-relationship-text: #fce4ec;
       --chen-ident-relationship-fill: #1e1e1e;
-      --chen-ident-relationship-stroke: #ff007f;
+      --chen-ident-relationship-stroke: #ffa090;
       --chen-attribute-fill: #1e1e1e;
       --chen-attribute-stroke: #b388ff;
       --chen-attribute-key-fill: #7c4dff;
@@ -46,7 +46,7 @@ const THEMES: Record<string, string> = {
       --chen-line: #90a4ae;
       --chen-line-text: #cfd8dc;
       --chen-spec-fill: #1e1e1e;
-      --chen-spec-stroke: #90a4ae;
+      --chen-spec-stroke: #FF5A43;
       --chen-spec-text: #cfd8dc;
     }
   `,
@@ -103,7 +103,7 @@ const THEMES: Record<string, string> = {
 const BASE_STYLES = `
   svg.chen-er-diagram {
     background-color: var(--chen-bg);
-    font-family: 'Inter', 'Segoe UI', Roboto, sans-serif;
+    font-family: 'Outfit', 'Inter', 'Segoe UI', Roboto, sans-serif;
   }
   .chen-text {
     font-size: 13px;
@@ -220,12 +220,12 @@ const BASE_STYLES = `
   .node-group.interactive.selected .chen-attribute-key,
   .node-group.interactive.selected .chen-attribute-double-outer,
   .node-group.interactive.selected .chen-attribute-dashed-ellipse {
-    stroke: #00bcd4 !important;
+    stroke: #FF5A43 !important;
     stroke-width: 3px !important;
   }
   .node-group.interactive .conn-port {
     fill: #ffffff;
-    stroke: #00bcd4;
+    stroke: #FF5A43;
     stroke-width: 1.5px;
     opacity: 0;
     transition: opacity 0.15s ease;

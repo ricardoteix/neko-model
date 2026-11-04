@@ -399,15 +399,39 @@ export class Parser {
         let cardinality: string | null = null;
         let role: string | null = null;
 
-        // Parse optional cardinality/role label : "label"
+        // Parse optional cardinality/role label : "label" or unquoted literal
         if (this.peek().type === "COLON") {
           this.advance(); // consume ':'
-          const labelTok = this.match("STRING");
-          // If label contains only simple alphanumeric or (min,max), treat as cardinality, otherwise role
-          if (/^[\dNM1:,\s()]+$/i.test(labelTok.value)) {
-            cardinality = labelTok.value;
+          let labelValue = "";
+          if (this.peek().type === "STRING") {
+            labelValue = this.advance().value;
+          } else if (this.peek().type === "PAREN_OPEN") {
+            labelValue += this.match("PAREN_OPEN").value;
+            const firstTok = this.advance();
+            if (firstTok.type !== "NUMBER" && firstTok.type !== "IDENTIFIER") {
+              throw new ParseError(`Expected number or identifier in cardinality but found '${firstTok.type}'`, firstTok.line, firstTok.col);
+            }
+            labelValue += firstTok.value;
+            labelValue += this.match("COMMA").value;
+            const secondTok = this.advance();
+            if (secondTok.type !== "NUMBER" && secondTok.type !== "IDENTIFIER") {
+              throw new ParseError(`Expected number or identifier in cardinality but found '${secondTok.type}'`, secondTok.line, secondTok.col);
+            }
+            labelValue += secondTok.value;
+            labelValue += this.match("PAREN_CLOSE").value;
           } else {
-            role = labelTok.value;
+            const tok = this.advance();
+            if (tok.type !== "NUMBER" && tok.type !== "IDENTIFIER") {
+              throw new ParseError(`Expected string, number, identifier or parenthesized cardinality but found '${tok.type}'`, tok.line, tok.col);
+            }
+            labelValue = tok.value;
+          }
+
+          // If label contains only simple alphanumeric or (min,max), treat as cardinality, otherwise role
+          if (/^[\dNM1:,\s()]+$/i.test(labelValue)) {
+            cardinality = labelValue;
+          } else {
+            role = labelValue;
           }
         }
 

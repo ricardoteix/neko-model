@@ -5,4 +5,6 @@
 5. SPEC não deve ter um valor padrão selecionado para a superclass.
 6. O botão de apagar o atributo que aparece quando selecionamos a entidade está ficando fora da tela.
 7. Deve ter um controle de ajuste do tamanho das áreas de preview e code.
+8. O nome do projeto agora é Neko Model. Atualize na interface e no package.json.
+9. Novo estilo visual com cores e fonte similar imagem ./assets/neko-model-logo-small.png
 
