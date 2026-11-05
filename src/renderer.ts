@@ -259,7 +259,9 @@ export function renderSVG(graph: PositionedGraph, options: RenderOptions = {}): 
   const themeName = options.theme || "default";
   const themeCSS = THEMES[themeName] || THEMES.default;
 
-  let output = `<svg class="chen-er-diagram" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${graph.width} ${graph.height}" width="100%" height="100%">\n`;
+  const minX = graph.minX ?? 0;
+  const minY = graph.minY ?? 0;
+  let output = `<svg class="chen-er-diagram" xmlns="http://www.w3.org/2000/svg" viewBox="${minX} ${minY} ${graph.width} ${graph.height}" width="100%" height="100%">\n`;
   
   // Inject stylesheets
   output += `  <style>\n${themeCSS}\n${BASE_STYLES}\n  </style>\n\n`;

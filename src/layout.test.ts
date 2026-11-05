@@ -514,4 +514,26 @@ describe("Chen ER Layout Manager Tests", () => {
     expect(graph.nodes.has("EmployeeType")).toBe(true);
     expect(graph.nodes.has("Manager")).toBe(true);
   });
+
+  test("Should compute negative minX and minY with padding when manual positions cause negative coordinate extents", () => {
+    const dsl = `
+      chenER
+      entity Customer [pos: 0, 0] {
+        name key
+        phones
+      }
+    `;
+
+    const ast = parseDSL(dsl);
+    const graph = layoutDiagram(ast);
+
+    // Customer at 0, 0 has radiating attributes that extend into negative space
+    expect(graph.minX).toBeDefined();
+    expect(graph.minY).toBeDefined();
+    expect(graph.minX!).toBeLessThan(0);
+    expect(graph.minY!).toBeLessThan(0);
+    // Width and height should encompass the full range plus padding
+    expect(graph.width).toBeGreaterThan(100);
+    expect(graph.height).toBeGreaterThan(100);
+  });
 });

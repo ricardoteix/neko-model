@@ -213,17 +213,22 @@ export class Lexer {
         // Map keywords to specific token types
         let type: Token["type"] = "IDENTIFIER";
         if (ident === "chenER") type = "HEADER";
-        else if (ident === "theme" || ident === "layout" || ident === "attribute_layout") type = "CONFIG";
-        else if (ident === "entity") type = "ENTITY";
-        else if (ident === "weak_entity") type = "WEAK_ENTITY";
-        else if (ident === "relationship") type = "RELATIONSHIP";
-        else if (ident === "identifying_relationship") type = "IDENTIFYING_RELATIONSHIP";
-        else if (ident === "specialization") type = "SPECIALIZATION";
-        else if (ident === "key") type = "KEY";
-        else if (ident === "weak_key") type = "WEAK_KEY";
-        else if (ident === "multivalued") type = "MULTIVALUED";
-        else if (ident === "derived") type = "DERIVED";
-        else if (ident === "composite") type = "COMPOSITE";
+        else if (ident === "theme" || ident === "layout" || ident === "attribute_layout" || ident === "tema" || ident === "layout_atributos") type = "CONFIG";
+        else if (ident === "entity" || ident === "entidade") type = "ENTITY";
+        else if (ident === "weak_entity" || ident === "entidade_fraca") type = "WEAK_ENTITY";
+        else if (ident === "relationship" || ident === "relacionamento") type = "RELATIONSHIP";
+        else if (
+          ident === "identifying_relationship" ||
+          ident === "ident_relationship" ||
+          ident === "relacionamento_identificador" ||
+          ident === "relacionamento_identificacao"
+        ) type = "IDENTIFYING_RELATIONSHIP";
+        else if (ident === "specialization" || ident === "especializacao") type = "SPECIALIZATION";
+        else if (ident === "key" || ident === "chave") type = "KEY";
+        else if (ident === "weak_key" || ident === "partial_key" || ident === "chave_parcial" || ident === "chave_fraca") type = "WEAK_KEY";
+        else if (ident === "multivalued" || ident === "multivalorado") type = "MULTIVALUED";
+        else if (ident === "derived" || ident === "derivado") type = "DERIVED";
+        else if (ident === "composite" || ident === "composto") type = "COMPOSITE";
 
         tokens.push({ type, value: ident, line: startLine, col: startCol });
         continue;
@@ -283,7 +288,10 @@ export class Parser {
       if (tok.type === "CONFIG") {
         const configTok = this.advance();
         const valueTok = this.match("IDENTIFIER");
-        ast.config[configTok.value] = valueTok.value;
+        let cfgKey = configTok.value;
+        if (cfgKey === "tema") cfgKey = "theme";
+        if (cfgKey === "layout_atributos") cfgKey = "attribute_layout";
+        ast.config[cfgKey] = valueTok.value;
       } else if (tok.type === "ENTITY" || tok.type === "WEAK_ENTITY") {
         const isWeak = tok.type === "WEAK_ENTITY";
         this.advance(); // consume keyword
@@ -348,19 +356,25 @@ export class Parser {
           const propTok = this.match("IDENTIFIER");
           this.match("COLON");
 
-          if (propTok.value === "type") {
+          if (propTok.value === "type" || propTok.value === "tipo") {
             const val = this.match("IDENTIFIER").value;
-            if (val !== "disjoint" && val !== "overlapping") {
-              throw new ParseError("Specialization type must be 'disjoint' or 'overlapping'", propTok.line, propTok.col);
+            if (val === "disjoint" || val === "disjunta") {
+              type = "disjoint";
+            } else if (val === "overlapping" || val === "sobreposta") {
+              type = "overlapping";
+            } else {
+              throw new ParseError("Specialization type must be 'disjoint'/'disjunta' or 'overlapping'/'sobreposta'", propTok.line, propTok.col);
             }
-            type = val as "disjoint" | "overlapping";
-          } else if (propTok.value === "participation") {
+          } else if (propTok.value === "participation" || propTok.value === "participacao") {
             const val = this.match("IDENTIFIER").value;
-            if (val !== "partial" && val !== "total") {
-              throw new ParseError("Specialization participation must be 'partial' or 'total'", propTok.line, propTok.col);
+            if (val === "partial" || val === "parcial") {
+              participation = "partial";
+            } else if (val === "total") {
+              participation = "total";
+            } else {
+              throw new ParseError("Specialization participation must be 'partial'/'parcial' or 'total'", propTok.line, propTok.col);
             }
-            participation = val as "partial" | "total";
-          } else if (propTok.value === "superclass") {
+          } else if (propTok.value === "superclass" || propTok.value === "superclasse") {
             superclass = this.match("IDENTIFIER").value;
           } else if (propTok.value === "subclasses") {
             subclasses.push(this.match("IDENTIFIER").value);

@@ -752,12 +752,18 @@ export class DagreRadialLayoutEngine implements LayoutEngine {
 
     const offsetX = hasAnyManualPos ? 0 : (minX === Infinity ? 0 : -minX + padding);
     const offsetY = hasAnyManualPos ? 0 : (minY === Infinity ? 0 : -minY + padding);
-    const width = hasAnyManualPos
-      ? (maxX === -Infinity ? 800 : maxX + padding * 2)
-      : (minX === Infinity ? 800 : maxX - minX + 2 * padding);
-    const height = hasAnyManualPos
-      ? (maxY === -Infinity ? 600 : maxY + padding * 2)
-      : (minY === Infinity ? 600 : maxY - minY + 2 * padding);
+    const computedMinX = hasAnyManualPos
+      ? (minX === Infinity ? 0 : Math.round(minX - padding))
+      : 0;
+    const computedMinY = hasAnyManualPos
+      ? (minY === Infinity ? 0 : Math.round(minY - padding))
+      : 0;
+    const width = (minX === Infinity || maxX === -Infinity)
+      ? 800
+      : Math.round(maxX - minX + 2 * padding);
+    const height = (minY === Infinity || maxY === -Infinity)
+      ? 600
+      : Math.round(maxY - minY + 2 * padding);
 
     // Shift nodes
     for (const node of nodes.values()) {
@@ -774,6 +780,8 @@ export class DagreRadialLayoutEngine implements LayoutEngine {
     }
 
     return {
+      minX: computedMinX,
+      minY: computedMinY,
       width,
       height,
       nodes,

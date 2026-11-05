@@ -101,6 +101,8 @@ export interface PositionedEdge {
 }
 
 export interface PositionedGraph {
+  minX?: number;
+  minY?: number;
   width: number;
   height: number;
   nodes: Map<string, PositionedNode>;

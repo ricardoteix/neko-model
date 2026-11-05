@@ -93,4 +93,25 @@ describe("Chen ER Renderer Tests", () => {
     expect(svg).toContain("--chen-entity-stroke: #2e7d32");
     expect(svg).toContain("--chen-attribute-key-fill: #f0e68c");
   });
+
+  test("Should render dynamic non-zero viewBox when manual positions extend into negative space", () => {
+    const dsl = `
+      chenER
+      entity Customer [pos: 0, 0] {
+        name key
+        address
+      }
+    `;
+
+    const svg = render(dsl);
+
+    // Should contain a viewBox with negative origin instead of fixed "0 0"
+    const viewBoxMatch = svg.match(/viewBox="(-?\d+)\s+(-?\d+)\s+(\d+)\s+(\d+)"/);
+    expect(viewBoxMatch).not.toBeNull();
+    const [, minX, minY, width, height] = viewBoxMatch!;
+    expect(Number(minX)).toBeLessThan(0);
+    expect(Number(minY)).toBeLessThan(0);
+    expect(Number(width)).toBeGreaterThan(150);
+    expect(Number(height)).toBeGreaterThan(150);
+  });
 });

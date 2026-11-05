@@ -370,8 +370,21 @@ body, html {
 
 /* Toolbox Styling */
 .toolbox-panel {
-  flex: 0 0 72px;
+  flex: 0 0 88px;
   align-items: center;
+}
+
+.toolbox-panel .panel-header {
+  padding: 12px 6px;
+  width: 100%;
+  justify-content: center;
+}
+
+.toolbox-panel .panel-header h2 {
+  font-size: 10px;
+  letter-spacing: 0.5px;
+  text-align: center;
+  white-space: nowrap;
 }
 
 .toolbox-items {
@@ -388,7 +401,7 @@ body, html {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  width: 52px;
+  width: 72px;
   height: 52px;
   border-radius: 8px;
   background: transparent;
@@ -397,6 +410,7 @@ body, html {
   cursor: pointer;
   outline: none;
   transition: all 0.2s ease;
+  padding: 4px 2px;
 }
 
 .tool-btn:hover {
@@ -419,15 +433,20 @@ body, html {
 }
 
 .tool-label {
-  font-size: 9px;
+  font-size: 8.5px;
   font-weight: 600;
   text-transform: uppercase;
-  letter-spacing: 0.5px;
+  letter-spacing: 0.2px;
+  text-align: center;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .tool-divider {
   height: 1px;
-  width: 32px;
+  width: 48px;
   background: var(--border-color);
   margin: 4px 0;
 }

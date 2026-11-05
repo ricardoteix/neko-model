@@ -1,12 +1,15 @@
 import { render, parseDSL, stringifyAST, layoutDiagram } from "../src/index";
 import { StyleOverride, Attribute } from "../src/types";
+import { initLanguage, getLanguage, setLanguage, getTranslation, DEFAULT_DIAGRAM_PT, DEFAULT_DIAGRAM_EN } from "./i18n";
 
 document.addEventListener("DOMContentLoaded", () => {
+  const langSelect = document.getElementById("lang-select") as HTMLSelectElement;
   const editor = document.getElementById("dsl-editor") as HTMLTextAreaElement;
   const preview = document.getElementById("canvas-preview") as HTMLDivElement;
   const themeSelect = document.getElementById("theme-select") as HTMLSelectElement;
   const spacingSelect = document.getElementById("spacing-select") as HTMLSelectElement;
   const btnCopy = document.getElementById("btn-copy") as HTMLButtonElement;
+  const btnExportNkm = document.getElementById("btn-export-nkm") as HTMLButtonElement;
   const btnExportSvg = document.getElementById("btn-export-svg") as HTMLButtonElement;
   
   const btnZoomIn = document.getElementById("btn-zoom-in") as HTMLButtonElement;
@@ -804,8 +807,117 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 
   // 4. Render Properties Inspector
+  function applyI18n() {
+    const t = getTranslation();
+    const lang = getLanguage();
+
+    if (langSelect) langSelect.value = lang;
+
+    // Header
+    const lblLang = document.getElementById("lbl-lang-select");
+    if (lblLang) lblLang.textContent = t.header.langLabel;
+
+    const lblTheme = document.getElementById("lbl-theme-select");
+    if (lblTheme) lblTheme.textContent = t.header.themeLabel;
+
+    const optDefault = document.getElementById("opt-theme-default");
+    if (optDefault) optDefault.textContent = t.header.themeDefault;
+    const optDark = document.getElementById("opt-theme-dark");
+    if (optDark) optDark.textContent = t.header.themeDark;
+    const optForest = document.getElementById("opt-theme-forest");
+    if (optForest) optForest.textContent = t.header.themeForest;
+    const optNeutral = document.getElementById("opt-theme-neutral");
+    if (optNeutral) optNeutral.textContent = t.header.themeNeutral;
+
+    const lblSpacing = document.getElementById("lbl-spacing-select");
+    if (lblSpacing) lblSpacing.textContent = t.header.spacingLabel;
+    const optSpDefault = document.getElementById("opt-spacing-default");
+    if (optSpDefault) optSpDefault.textContent = t.header.spacingDefault;
+    const optSpZigzag = document.getElementById("opt-spacing-zigzag");
+    if (optSpZigzag) optSpZigzag.textContent = t.header.spacingZigzag;
+    const optSpClassic = document.getElementById("opt-spacing-classic");
+    if (optSpClassic) optSpClassic.textContent = t.header.spacingClassic;
+
+    if (btnCopy) {
+      btnCopy.textContent = t.header.copyCode;
+      btnCopy.title = t.header.copyCode;
+    }
+    if (btnExportNkm) {
+      btnExportNkm.textContent = t.header.exportNkm;
+      btnExportNkm.title = t.header.exportNkm;
+    }
+    if (btnExportSvg) {
+      btnExportSvg.textContent = t.header.exportSvg;
+      btnExportSvg.title = t.header.exportSvg;
+    }
+
+    // Toolbox
+    const toolboxTitle = document.getElementById("toolbox-title");
+    if (toolboxTitle) toolboxTitle.textContent = t.toolbox.title;
+
+    const toolBtnSelect = document.getElementById("tool-btn-select");
+    if (toolBtnSelect) toolBtnSelect.title = t.toolbox.selectTitle;
+    const toolLblSelect = document.getElementById("tool-lbl-select");
+    if (toolLblSelect) toolLblSelect.textContent = t.toolbox.select;
+
+    const toolBtnEntity = document.getElementById("tool-btn-entity");
+    if (toolBtnEntity) toolBtnEntity.title = t.toolbox.entityTitle;
+    const toolLblEntity = document.getElementById("tool-lbl-entity");
+    if (toolLblEntity) toolLblEntity.textContent = t.toolbox.entity;
+
+    const toolBtnRel = document.getElementById("tool-btn-relationship");
+    if (toolBtnRel) toolBtnRel.title = t.toolbox.relTitle;
+    const toolLblRel = document.getElementById("tool-lbl-relationship");
+    if (toolLblRel) toolLblRel.textContent = t.toolbox.rel;
+
+    const toolBtnSpec = document.getElementById("tool-btn-specialization");
+    if (toolBtnSpec) toolBtnSpec.title = t.toolbox.specTitle;
+    const toolLblSpec = document.getElementById("tool-lbl-specialization");
+    if (toolLblSpec) toolLblSpec.textContent = t.toolbox.spec;
+
+    const toolBtnAttr = document.getElementById("tool-btn-attribute");
+    if (toolBtnAttr) toolBtnAttr.title = t.toolbox.attrTitle;
+    const toolLblAttr = document.getElementById("tool-lbl-attribute");
+    if (toolLblAttr) toolLblAttr.textContent = t.toolbox.attr;
+
+    // Editor
+    const editorTitle = document.getElementById("editor-title");
+    if (editorTitle) editorTitle.textContent = t.editor.title;
+    const editorFileName = document.getElementById("editor-file-name");
+    if (editorFileName) editorFileName.textContent = t.editor.fileName;
+
+    // Visualizer actions
+    const visualizerTitle = document.getElementById("visualizer-title");
+    if (visualizerTitle) visualizerTitle.textContent = t.visualizer.title;
+    if (btnUndo) btnUndo.title = t.visualizer.undoTitle;
+    if (btnRedo) btnRedo.title = t.visualizer.redoTitle;
+    if (btnZoomOut) btnZoomOut.title = t.visualizer.zoomOutTitle;
+    if (btnZoomIn) btnZoomIn.title = t.visualizer.zoomInTitle;
+    if (btnZoomReset) btnZoomReset.textContent = t.visualizer.zoomReset;
+    if (btnAlignH) {
+      btnAlignH.textContent = t.visualizer.alignH;
+      btnAlignH.title = t.visualizer.alignHTitle;
+    }
+    if (btnAlignV) {
+      btnAlignV.textContent = t.visualizer.alignV;
+      btnAlignV.title = t.visualizer.alignVTitle;
+    }
+    const lblSnap = document.getElementById("lbl-snap");
+    if (lblSnap) lblSnap.textContent = t.visualizer.snap;
+    if (btnToggleEditor) btnToggleEditor.textContent = t.editor.toggle;
+
+    // Inspector
+    const inspectorTitle = document.getElementById("inspector-title");
+    if (inspectorTitle) inspectorTitle.textContent = t.inspector.title;
+    const inspectorEmptyState = document.getElementById("inspector-empty-state");
+    if (inspectorEmptyState) inspectorEmptyState.textContent = t.inspector.emptyState;
+
+    renderInspector();
+  }
+
   function renderInspector() {
     inspectorContent.innerHTML = "";
+    const t = getTranslation().inspector;
 
     // A. Inspector for Nodes (Entity, Relationship, Specialization, Attribute)
     if (selectedId && selectedType) {
@@ -821,16 +933,16 @@ document.addEventListener("DOMContentLoaded", () => {
                 <button class="btn btn-sm btn-delete-attr" data-index="${idx}" style="color: var(--error); border-color: rgba(239,68,68,0.3); background: rgba(239,68,68,0.05);">✕</button>
               </div>
               <label class="inspector-checkbox">
-                <input type="checkbox" class="attr-key-checkbox" data-index="${idx}" ${a.isKey ? "checked" : ""} /> Key (🔑)
+                <input type="checkbox" class="attr-key-checkbox" data-index="${idx}" ${a.isKey ? "checked" : ""} /> ${t.primaryKey}
               </label>
               <label class="inspector-checkbox">
-                <input type="checkbox" class="attr-weak-checkbox" data-index="${idx}" ${a.isWeakKey ? "checked" : ""} /> Weak Key
+                <input type="checkbox" class="attr-weak-checkbox" data-index="${idx}" ${a.isWeakKey ? "checked" : ""} /> ${t.partialKey}
               </label>
               <label class="inspector-checkbox">
-                <input type="checkbox" class="attr-multi-checkbox" data-index="${idx}" ${a.isMultivalued ? "checked" : ""} /> Multivalued
+                <input type="checkbox" class="attr-multi-checkbox" data-index="${idx}" ${a.isMultivalued ? "checked" : ""} /> ${t.multivalued}
               </label>
               <label class="inspector-checkbox">
-                <input type="checkbox" class="attr-derived-checkbox" data-index="${idx}" ${a.isDerived ? "checked" : ""} /> Derived
+                <input type="checkbox" class="attr-derived-checkbox" data-index="${idx}" ${a.isDerived ? "checked" : ""} /> ${t.derived}
               </label>
             </div>
           `;
@@ -838,24 +950,24 @@ document.addEventListener("DOMContentLoaded", () => {
 
         inspectorContent.innerHTML = `
           <div class="inspector-group">
-            <label>Name</label>
+            <label>${t.name}</label>
             <input type="text" id="node-name" value="${ent.id}" />
           </div>
           <div class="inspector-group">
             <label class="inspector-checkbox">
-              <input type="checkbox" id="entity-weak-chk" ${ent.isWeak ? "checked" : ""} /> Weak Entity
+              <input type="checkbox" id="entity-weak-chk" ${ent.isWeak ? "checked" : ""} /> ${t.weakEntity}
             </label>
           </div>
           <div class="tool-divider" style="margin: 10px 0;"></div>
           <div class="inspector-group">
-            <label>Attributes</label>
+            <label>${t.attributes}</label>
             <div id="inspector-attrs" style="max-height: 250px; overflow-y: auto; margin-bottom: 8px;">
-              ${attributesHTML || '<p style="font-size: 12px; color: var(--color-muted); text-align: center; margin: 10px 0;">No attributes</p>'}
+              ${attributesHTML || `<p style="font-size: 12px; color: var(--color-muted); text-align: center; margin: 10px 0;">${t.noAttributes}</p>`}
             </div>
-            <button id="btn-add-attr-panel" class="btn btn-sm btn-primary">+ Add Attribute</button>
+            <button id="btn-add-attr-panel" class="btn btn-sm btn-primary">${t.addAttribute}</button>
           </div>
           <div class="tool-divider" style="margin: 15px 0;"></div>
-          <button id="btn-delete-node" class="btn btn-sm" style="color: var(--error); border-color: rgba(239,68,68,0.4); background: rgba(239,68,68,0.05); width: 100%;">Delete Entity</button>
+          <button id="btn-delete-node" class="btn btn-sm" style="color: var(--error); border-color: rgba(239,68,68,0.4); background: rgba(239,68,68,0.05); width: 100%;">${t.deleteEntity}</button>
         `;
 
         // Bind events for Entity Inspector (renaming inputs update with key input directly)
@@ -997,16 +1109,16 @@ document.addEventListener("DOMContentLoaded", () => {
 
         inspectorContent.innerHTML = `
           <div class="inspector-group">
-            <label>Name</label>
+            <label>${t.name}</label>
             <input type="text" id="node-name" value="${rel.id}" />
           </div>
           <div class="inspector-group">
             <label class="inspector-checkbox">
-              <input type="checkbox" id="rel-ident-chk" ${rel.isIdentifying ? "checked" : ""} /> Identifying Relationship
+              <input type="checkbox" id="rel-ident-chk" ${rel.isIdentifying ? "checked" : ""} /> ${t.identifyingRel}
             </label>
           </div>
           <div class="tool-divider" style="margin: 15px 0;"></div>
-          <button id="btn-delete-node" class="btn btn-sm" style="color: var(--error); border-color: rgba(239,68,68,0.4); background: rgba(239,68,68,0.05); width: 100%;">Delete Relationship</button>
+          <button id="btn-delete-node" class="btn btn-sm" style="color: var(--error); border-color: rgba(239,68,68,0.4); background: rgba(239,68,68,0.05); width: 100%;">${t.deleteRelationship}</button>
         `;
 
         const nameInput = document.getElementById("node-name") as HTMLInputElement;
@@ -1049,7 +1161,7 @@ document.addEventListener("DOMContentLoaded", () => {
         const hasSuperclass = !!spec.superclass;
         const emptySelected = !hasSuperclass ? "selected" : "";
         const superclassOptions = `
-          <option value="" ${emptySelected}>-- None --</option>
+          <option value="" ${emptySelected}>${t.none}</option>
           ${parsedAST.entities.map((ent: any) => {
             const isSelected = ent.id === spec.superclass ? "selected" : "";
             return `<option value="${ent.id}" ${isSelected}>${ent.id}</option>`;
@@ -1069,37 +1181,37 @@ document.addEventListener("DOMContentLoaded", () => {
 
         inspectorContent.innerHTML = `
           <div class="inspector-group">
-            <label>Name</label>
+            <label>${t.name}</label>
             <input type="text" id="node-name" value="${spec.id}" />
           </div>
           <div class="inspector-group">
-            <label>Disjunction Constraint</label>
+            <label>${t.disjunctionConstraint}</label>
             <select id="spec-type-select">
-              <option value="disjoint" ${spec.type === "disjoint" ? "selected" : ""}>Disjoint (d)</option>
-              <option value="overlapping" ${spec.type === "overlapping" ? "selected" : ""}>Overlapping (o)</option>
+              <option value="disjoint" ${spec.type === "disjoint" ? "selected" : ""}>${t.disjoint}</option>
+              <option value="overlapping" ${spec.type === "overlapping" ? "selected" : ""}>${t.overlapping}</option>
             </select>
           </div>
           <div class="inspector-group">
-            <label>Participation</label>
+            <label>${t.participation}</label>
             <select id="spec-part-select">
-              <option value="partial" ${spec.participation === "partial" ? "selected" : ""}>Partial</option>
-              <option value="total" ${spec.participation === "total" ? "selected" : ""}>Total (==)</option>
+              <option value="partial" ${spec.participation === "partial" ? "selected" : ""}>${t.partial}</option>
+              <option value="total" ${spec.participation === "total" ? "selected" : ""}>${t.total}</option>
             </select>
           </div>
           <div class="inspector-group">
-            <label>Superclass</label>
+            <label>${t.superclass}</label>
             <select id="spec-superclass-select">
               ${superclassOptions}
             </select>
           </div>
           <div class="inspector-group">
-            <label>Subclasses</label>
+            <label>${t.subclasses}</label>
             <div style="max-height: 120px; overflow-y: auto; padding: 6px; border: 1px solid var(--border-color); border-radius: 6px; background: rgba(0,0,0,0.15)">
-              ${subclassChecklist || '<p style="font-size:12px; color:var(--color-muted)">No entities available</p>'}
+              ${subclassChecklist || `<p style="font-size:12px; color:var(--color-muted)">${t.noEntitiesAvailable}</p>`}
             </div>
           </div>
           <div class="tool-divider" style="margin: 15px 0;"></div>
-          <button id="btn-delete-node" class="btn btn-sm" style="color: var(--error); border-color: rgba(239,68,68,0.4); background: rgba(239,68,68,0.05); width: 100%;">Delete Specialization</button>
+          <button id="btn-delete-node" class="btn btn-sm" style="color: var(--error); border-color: rgba(239,68,68,0.4); background: rgba(239,68,68,0.05); width: 100%;">${t.deleteSpecialization}</button>
         `;
 
         const nameInput = document.getElementById("node-name") as HTMLInputElement;
@@ -1186,26 +1298,26 @@ document.addEventListener("DOMContentLoaded", () => {
 
         inspectorContent.innerHTML = `
           <div class="inspector-group">
-            <label>Name</label>
+            <label>${t.name}</label>
             <input type="text" id="node-name" value="${attr.id}" />
           </div>
           <div class="inspector-group">
-            <label>Constraints</label>
+            <label>${t.constraints}</label>
             <label class="inspector-checkbox">
-              <input type="checkbox" id="attr-key-chk" ${attr.isKey ? "checked" : ""} /> Primary Key (🔑)
+              <input type="checkbox" id="attr-key-chk" ${attr.isKey ? "checked" : ""} /> ${t.primaryKey}
             </label>
             <label class="inspector-checkbox">
-              <input type="checkbox" id="attr-weak-chk" ${attr.isWeakKey ? "checked" : ""} /> Partial Key (🗝️)
+              <input type="checkbox" id="attr-weak-chk" ${attr.isWeakKey ? "checked" : ""} /> ${t.partialKey}
             </label>
             <label class="inspector-checkbox">
-              <input type="checkbox" id="attr-multi-chk" ${attr.isMultivalued ? "checked" : ""} /> Multivalued (◯)
+              <input type="checkbox" id="attr-multi-chk" ${attr.isMultivalued ? "checked" : ""} /> ${t.multivalued}
             </label>
             <label class="inspector-checkbox">
-              <input type="checkbox" id="attr-derived-chk" ${attr.isDerived ? "checked" : ""} /> Derived (╌)
+              <input type="checkbox" id="attr-derived-chk" ${attr.isDerived ? "checked" : ""} /> ${t.derived}
             </label>
           </div>
           <div class="tool-divider" style="margin: 15px 0;"></div>
-          <button id="btn-delete-node" class="btn btn-sm" style="color: var(--error); border-color: rgba(239,68,68,0.4); background: rgba(239,68,68,0.05); width: 100%;">Delete Attribute</button>
+          <button id="btn-delete-node" class="btn btn-sm" style="color: var(--error); border-color: rgba(239,68,68,0.4); background: rgba(239,68,68,0.05); width: 100%;">${t.deleteAttribute}</button>
         `;
 
         const nameInput = document.getElementById("node-name") as HTMLInputElement;
@@ -1292,28 +1404,28 @@ document.addEventListener("DOMContentLoaded", () => {
 
       inspectorContent.innerHTML = `
         <div class="inspector-group">
-          <label>Cardinality / Role</label>
-          <input type="text" id="conn-label" value="${conn.cardinality || conn.role || ""}" placeholder="e.g. 1, N, M, or role" />
+          <label>${t.cardinalityRole}</label>
+          <input type="text" id="conn-label" value="${conn.cardinality || conn.role || ""}" placeholder="${t.cardinalityPlaceholder}" />
         </div>
         <div class="inspector-group">
-          <label>Participation</label>
+          <label>${t.participation}</label>
           <select id="conn-part-select">
-            <option value="partial" ${conn.participation === "partial" ? "selected" : ""}>Partial (--)</option>
-            <option value="total" ${conn.participation === "total" ? "selected" : ""}>Total (==)</option>
+            <option value="partial" ${conn.participation === "partial" ? "selected" : ""}>${t.partial}</option>
+            <option value="total" ${conn.participation === "total" ? "selected" : ""}>${t.total}</option>
           </select>
         </div>
         <div class="inspector-group">
-          <label>Layout Direction (dir)</label>
+          <label>${t.layoutDirection}</label>
           <select id="conn-dir-select">
-            <option value="" ${!conn.dir ? "selected" : ""}>None (Auto)</option>
-            <option value="right" ${conn.dir === "right" ? "selected" : ""}>Right (➔)</option>
-            <option value="left" ${conn.dir === "left" ? "selected" : ""}>Left (↞)</option>
-            <option value="down" ${conn.dir === "down" ? "selected" : ""}>Down (▼)</option>
-            <option value="up" ${conn.dir === "up" ? "selected" : ""}>Up (▲)</option>
+            <option value="" ${!conn.dir ? "selected" : ""}>${t.dirNone}</option>
+            <option value="right" ${conn.dir === "right" ? "selected" : ""}>${t.dirRight}</option>
+            <option value="left" ${conn.dir === "left" ? "selected" : ""}>${t.dirLeft}</option>
+            <option value="down" ${conn.dir === "down" ? "selected" : ""}>${t.dirDown}</option>
+            <option value="up" ${conn.dir === "up" ? "selected" : ""}>${t.dirUp}</option>
           </select>
         </div>
         <div class="tool-divider" style="margin: 15px 0;"></div>
-        <button id="btn-delete-edge" class="btn btn-sm" style="color: var(--error); border-color: rgba(239,68,68,0.4); background: rgba(239,68,68,0.05); width: 100%;">Delete Link</button>
+        <button id="btn-delete-edge" class="btn btn-sm" style="color: var(--error); border-color: rgba(239,68,68,0.4); background: rgba(239,68,68,0.05); width: 100%;">${t.deleteLink}</button>
       `;
 
       const labelInput = document.getElementById("conn-label") as HTMLInputElement;
@@ -1353,7 +1465,7 @@ document.addEventListener("DOMContentLoaded", () => {
         serializeAndSync();
       });
     } else {
-      inspectorContent.innerHTML = `<p class="empty-state">Select a node or connection line to inspect properties</p>`;
+      inspectorContent.innerHTML = `<p class="empty-state">${t.emptyState}</p>`;
     }
   }
 
@@ -1398,7 +1510,7 @@ document.addEventListener("DOMContentLoaded", () => {
   btnCopy.addEventListener("click", () => {
     navigator.clipboard.writeText(editor.value).then(() => {
       const originalText = btnCopy.textContent;
-      btnCopy.textContent = "Copied!";
+      btnCopy.textContent = getTranslation().header.copied;
       btnCopy.classList.add("btn-primary");
       
       setTimeout(() => {
@@ -1406,6 +1518,25 @@ document.addEventListener("DOMContentLoaded", () => {
         btnCopy.classList.remove("btn-primary");
       }, 1500);
     });
+  });
+
+  // Export diagram DSL code as .nkm file download
+  btnExportNkm?.addEventListener("click", () => {
+    try {
+      const code = editor.value;
+      const blob = new Blob([code], { type: "text/plain;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = "model.nkm";
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    } catch (err: any) {
+      alert("Failed to export .nkm: " + err.message);
+    }
   });
 
   // Export diagram as static SVG file download
@@ -1512,6 +1643,35 @@ document.addEventListener("DOMContentLoaded", () => {
       }
     });
   }
+
+  // Language Initialization
+  const currentLang = initLanguage();
+  if (langSelect) {
+    langSelect.value = currentLang;
+    langSelect.addEventListener("change", () => {
+      const newLang = langSelect.value as "pt-br" | "en";
+      const oldLang = getLanguage();
+      setLanguage(newLang);
+      applyI18n();
+
+      // If the editor still has the initial starter diagram of the other language, switch it
+      const currentCode = editor.value.trim();
+      if (oldLang === "pt-br" && (currentCode === DEFAULT_DIAGRAM_PT.trim() || !currentCode)) {
+        editor.value = DEFAULT_DIAGRAM_EN;
+        compileDiagram();
+      } else if (oldLang === "en" && (currentCode === DEFAULT_DIAGRAM_EN.trim() || !currentCode)) {
+        editor.value = DEFAULT_DIAGRAM_PT;
+        compileDiagram();
+      }
+    });
+  }
+
+  // Load starter diagram if editor is empty
+  if (!editor.value.trim()) {
+    editor.value = currentLang === "pt-br" ? DEFAULT_DIAGRAM_PT : DEFAULT_DIAGRAM_EN;
+  }
+
+  applyI18n();
 
   // Initial compile run
   compileDiagram();

@@ -204,4 +204,86 @@ describe("Chen ER DSL Parser Tests", () => {
     expect(ast.connections[2].cardinality).toBe("(1,1)");
     expect(ast.connections[3].cardinality).toBe("(0,N)");
   });
+
+  test("Should parse diagrams written entirely with Portuguese keywords", () => {
+    const dsl = `
+      chenER
+      tema dark
+      layout_atributos zigzag
+
+      entidade Cliente {
+        id chave
+        nome
+        telefones multivalorado
+        idade derivado
+        endereco composto(rua, cidade)
+      }
+
+      entidade_fraca Dependente {
+        nome_dep chave_parcial
+      }
+
+      relacionamento Possui
+      relacionamento_identificador Possui_Dep
+
+      especializacao TipoPessoa {
+        superclasse: Cliente
+        subclasses: PessoaFisica, PessoaJuridica
+        tipo: disjunta
+        participacao: total
+      }
+
+      Cliente == Possui : 1
+      Possui -- Dependente : N
+    `;
+
+    const ast = parseDSL(dsl);
+
+    // Verify configs
+    expect(ast.config.theme).toBe("dark");
+    expect(ast.config.attribute_layout).toBe("zigzag");
+
+    // Verify entities
+    expect(ast.entities).toHaveLength(2);
+    const cliente = ast.entities.find((e) => e.id === "Cliente")!;
+    expect(cliente).toBeDefined();
+    expect(cliente.isWeak).toBe(false);
+    expect(cliente.attributes).toHaveLength(5);
+    expect(cliente.attributes[0].id).toBe("id");
+    expect(cliente.attributes[0].isKey).toBe(true);
+    expect(cliente.attributes[2].id).toBe("telefones");
+    expect(cliente.attributes[2].isMultivalued).toBe(true);
+    expect(cliente.attributes[3].id).toBe("idade");
+    expect(cliente.attributes[3].isDerived).toBe(true);
+    expect(cliente.attributes[4].id).toBe("endereco");
+    expect(cliente.attributes[4].isComposite).toBe(true);
+    expect(cliente.attributes[4].children).toHaveLength(2);
+
+    const dep = ast.entities.find((e) => e.id === "Dependente")!;
+    expect(dep.isWeak).toBe(true);
+    expect(dep.attributes[0].isWeakKey).toBe(true);
+
+    // Verify relationships
+    expect(ast.relationships).toHaveLength(2);
+    const possui = ast.relationships.find((r) => r.id === "Possui")!;
+    expect(possui.isIdentifying).toBe(false);
+    const possuiDep = ast.relationships.find((r) => r.id === "Possui_Dep")!;
+    expect(possuiDep.isIdentifying).toBe(true);
+
+    // Verify specialization
+    expect(ast.specializations).toHaveLength(1);
+    const spec = ast.specializations[0];
+    expect(spec.id).toBe("TipoPessoa");
+    expect(spec.superclass).toBe("Cliente");
+    expect(spec.subclasses).toEqual(["PessoaFisica", "PessoaJuridica"]);
+    expect(spec.type).toBe("disjoint");
+    expect(spec.participation).toBe("total");
+
+    // Verify connections
+    expect(ast.connections).toHaveLength(2);
+    expect(ast.connections[0].from).toBe("Cliente");
+    expect(ast.connections[0].to).toBe("Possui");
+    expect(ast.connections[0].participation).toBe("total");
+    expect(ast.connections[0].cardinality).toBe("1");
+  });
 });

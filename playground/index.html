@@ -20,27 +20,37 @@
       </div>
       <div class="controls-section">
         <div class="select-wrapper">
-          <label for="theme-select">Theme:</label>
-          <select id="theme-select">
-            <option value="default" selected>Default (Light)</option>
-            <option value="dark">Dark Mode</option>
-            <option value="forest">Forest Green</option>
-            <option value="neutral">Neutral (B&W)</option>
+          <label for="lang-select" id="lbl-lang-select">Idioma:</label>
+          <select id="lang-select">
+            <option value="pt-br" selected>Português</option>
+            <option value="en">English</option>
           </select>
         </div>
         <div class="select-wrapper">
-          <label for="spacing-select">Attribute Spacing:</label>
-          <select id="spacing-select">
-            <option value="default" selected>Default (Dynamic)</option>
-            <option value="zigzag">Zigzag Alternating</option>
-            <option value="classic">Classic (Legacy)</option>
+          <label for="theme-select" id="lbl-theme-select">Tema:</label>
+          <select id="theme-select">
+            <option value="default" id="opt-theme-default" selected>Padrão (Claro)</option>
+            <option value="dark" id="opt-theme-dark">Modo Escuro</option>
+            <option value="forest" id="opt-theme-forest">Verde Floresta</option>
+            <option value="neutral" id="opt-theme-neutral">Neutro (P&B)</option>
           </select>
         </div>
-        <button id="btn-copy" class="btn" title="Copy Diagram Code">
-          Copy Code
+        <div class="select-wrapper">
+          <label for="spacing-select" id="lbl-spacing-select">Espaçamento de Atributos:</label>
+          <select id="spacing-select">
+            <option value="default" id="opt-spacing-default" selected>Padrão (Dinâmico)</option>
+            <option value="zigzag" id="opt-spacing-zigzag">Zigue-zague Alternado</option>
+            <option value="classic" id="opt-spacing-classic">Clássico (Legado)</option>
+          </select>
+        </div>
+        <button id="btn-copy" class="btn" title="Copiar Código">
+          Copiar Código
         </button>
-        <button id="btn-export-svg" class="btn btn-primary" title="Export as SVG File">
-          Export SVG
+        <button id="btn-export-nkm" class="btn" title="Exportar .nkm">
+          Exportar .nkm
+        </button>
+        <button id="btn-export-svg" class="btn btn-primary" title="Exportar SVG">
+          Exportar SVG
         </button>
       </div>
     </header>
@@ -49,30 +59,30 @@
     <main class="workspace">
       <!-- Toolbox Panel -->
       <section class="panel toolbox-panel">
-        <div class="panel-header" style="padding: 12px 10px; justify-content: center;">
-          <h2 style="font-size: 11px;">Tools</h2>
+        <div class="panel-header">
+          <h2 id="toolbox-title">Ferramentas</h2>
         </div>
         <div class="toolbox-items">
-          <button class="tool-btn active" data-tool="select" title="Selection Tool (Esc)">
+          <button class="tool-btn active" id="tool-btn-select" data-tool="select" title="Ferramenta de Seleção (Esc)">
             <span class="tool-icon">↖</span>
-            <span class="tool-label">Select</span>
+            <span class="tool-label" id="tool-lbl-select">Selecionar</span>
           </button>
           <div class="tool-divider"></div>
-          <button class="tool-btn" data-tool="entity" title="Add Entity">
+          <button class="tool-btn" id="tool-btn-entity" data-tool="entity" title="Adicionar Entidade">
             <span class="tool-icon">⬡</span>
-            <span class="tool-label">Entity</span>
+            <span class="tool-label" id="tool-lbl-entity">Entidade</span>
           </button>
-          <button class="tool-btn" data-tool="relationship" title="Add Relationship">
+          <button class="tool-btn" id="tool-btn-relationship" data-tool="relationship" title="Adicionar Relacionamento">
             <span class="tool-icon">♢</span>
-            <span class="tool-label">Rel</span>
+            <span class="tool-label" id="tool-lbl-relationship">Relac.</span>
           </button>
-          <button class="tool-btn" data-tool="specialization" title="Add Specialization">
+          <button class="tool-btn" id="tool-btn-specialization" data-tool="specialization" title="Adicionar Especialização">
             <span class="tool-icon">◯</span>
-            <span class="tool-label">Spec</span>
+            <span class="tool-label" id="tool-lbl-specialization">Espec.</span>
           </button>
-          <button class="tool-btn" data-tool="attribute" title="Add Attribute">
+          <button class="tool-btn" id="tool-btn-attribute" data-tool="attribute" title="Adicionar Atributo">
             <span class="tool-icon">⚬</span>
-            <span class="tool-label">Attr</span>
+            <span class="tool-label" id="tool-lbl-attribute">Atributo</span>
           </button>
         </div>
       </section>
@@ -80,55 +90,11 @@
       <!-- Left Panel: Code Editor -->
       <section class="panel editor-panel" id="editor-panel">
         <div class="panel-header">
-          <h2>DSL Source</h2>
-          <span class="file-name">diagram.chen</span>
+          <h2 id="editor-title">Código DSL</h2>
+          <span class="file-name" id="editor-file-name">diagrama.nkm</span>
         </div>
         <div class="editor-wrapper">
-          <textarea id="dsl-editor" spellcheck="false" autocomplete="off">chenER
-theme dark
-layout default
-
-entity Customer {
-  id key
-  name
-  phones multivalued [offset: 0, 15]
-  address composite(street, city, zip)
-}
-
-weak_entity Order {
-  order_no weak_key
-  order_date
-}
-
-relationship Places {
-  purchase_date
-}
-
-identifying_relationship Has
-
-entity Item {
-  item_code key
-  price
-}
-
-Customer -- Places : "1"
-Places == Order : "N"
-
-Order == Has : "1"
-Has == Item : "M"
-
-specialization EmployeeType {
-  type: disjoint
-  participation: total
-  superclass: Employee
-  subclasses: Manager, Technician
-}
-
-entity Employee {
-  ssn key
-}
-entity Manager
-entity Technician</textarea>
+          <textarea id="dsl-editor" spellcheck="false" autocomplete="off"></textarea>
         </div>
       </section>
 
@@ -138,20 +104,20 @@ entity Technician</textarea>
       <!-- Center Panel: SVG Visualizer -->
       <section class="panel visualizer-panel">
         <div class="panel-header">
-          <h2>Live Preview</h2>
+          <h2 id="visualizer-title">Visualização</h2>
           <div class="canvas-actions" style="display: flex; gap: 8px; align-items: center;">
-            <button id="btn-undo" class="btn btn-sm" title="Undo (Ctrl+Z)" disabled>↶</button>
-            <button id="btn-redo" class="btn btn-sm" title="Redo (Ctrl+Y)" disabled>↷</button>
+            <button id="btn-undo" class="btn btn-sm" title="Desfazer (Ctrl+Z)" disabled>↶</button>
+            <button id="btn-redo" class="btn btn-sm" title="Refazer (Ctrl+Y)" disabled>↷</button>
             <div style="width: 1px; height: 16px; background: var(--border-color);"></div>
-            <button id="btn-zoom-out" class="btn btn-sm" title="Zoom Out">-</button>
-            <button id="btn-zoom-in" class="btn btn-sm" title="Zoom In">+</button>
-            <button id="btn-zoom-reset" class="btn btn-sm">Reset</button>
+            <button id="btn-zoom-out" class="btn btn-sm" title="Diminuir Zoom">-</button>
+            <button id="btn-zoom-in" class="btn btn-sm" title="Aumentar Zoom">+</button>
+            <button id="btn-zoom-reset" class="btn btn-sm">Resetar</button>
             <div style="width: 1px; height: 16px; background: var(--border-color);"></div>
-            <button id="btn-align-h" class="btn btn-sm" title="Align Horizontally" style="font-size: 10px; padding: 2px 6px;">Align H</button>
-            <button id="btn-align-v" class="btn btn-sm" title="Align Vertically" style="font-size: 10px; padding: 2px 6px;">Align V</button>
+            <button id="btn-align-h" class="btn btn-sm" title="Alinhar Horizontalmente" style="font-size: 10px; padding: 2px 6px;">Alinhar H</button>
+            <button id="btn-align-v" class="btn btn-sm" title="Alinhar Verticalmente" style="font-size: 10px; padding: 2px 6px;">Alinhar V</button>
             <div style="width: 1px; height: 16px; background: var(--border-color);"></div>
             <label class="inspector-checkbox" style="margin: 0; font-size: 11px; color: var(--color-muted); display: flex; align-items: center; gap: 4px; user-select: none;">
-              <input type="checkbox" id="chk-snap" checked /> Snap
+              <input type="checkbox" id="chk-snap" checked /> <span id="lbl-snap">Grade</span>
             </label>
             <div class="select-wrapper" style="margin: 0 4px; font-size: 11px;">
               <select id="select-snap-size" style="padding: 2px 6px; font-size: 11px; height: auto;">
@@ -162,7 +128,7 @@ entity Technician</textarea>
               </select>
             </div>
             <div style="width: 1px; height: 16px; background: var(--border-color);"></div>
-            <button id="btn-toggle-editor" class="btn btn-sm" style="background: rgba(6,182,212,0.1); border-color: rgba(6,182,212,0.3); color: var(--primary);">Toggle Code</button>
+            <button id="btn-toggle-editor" class="btn btn-sm" style="background: rgba(6,182,212,0.1); border-color: rgba(6,182,212,0.3); color: var(--primary);">Código</button>
           </div>
         </div>
         <div class="canvas-container" style="cursor: grab;">
@@ -174,10 +140,10 @@ entity Technician</textarea>
       <!-- Right Panel: Properties Inspector -->
       <section class="panel inspector-panel">
         <div class="panel-header">
-          <h2>Properties</h2>
+          <h2 id="inspector-title">Propriedades</h2>
         </div>
         <div id="inspector-content" class="inspector-content">
-          <p class="empty-state">Select a node or connection line to inspect properties</p>
+          <p class="empty-state" id="inspector-empty-state">Selecione um elemento ou linha para editar suas propriedades</p>
         </div>
       </section>
     </main>
