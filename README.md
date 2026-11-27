@@ -2,7 +2,9 @@
 
 Um parser, renderizador e editor visual bidirecional para Diagramas Entidade-Relacionamento (DER) baseados na notação de Peter Chen. Este projeto fornece uma linguagem específica de domínio (DSL) robusta chamada **`chenER`** para definir diagramas como código, acoplada a uma interface visual interativa para arrastar, conectar e editar elementos com sincronização automática do código.
 
-🎮 **Acesse o Playground Online:** [https://ricardoteix.github.io/neko-model/](https://ricardoteix.github.io/neko-model/)
+## Playground
+
+Acesse [aqui https://ricardoteix.github.io/neko-model/](https://ricardoteix.github.io/neko-model/)
 
 ---
 
