@@ -12,6 +12,8 @@ document.addEventListener("DOMContentLoaded", () => {
   const themeSelect = document.getElementById("theme-select") as HTMLSelectElement;
   const spacingSelect = document.getElementById("spacing-select") as HTMLSelectElement;
   const btnCopy = document.getElementById("btn-copy") as HTMLButtonElement;
+  const btnOpenNkm = document.getElementById("btn-open-nkm") as HTMLButtonElement;
+  const inputOpenNkm = document.getElementById("input-open-nkm") as HTMLInputElement;
   const btnExportNkm = document.getElementById("btn-export-nkm") as HTMLButtonElement;
   const btnExportImg = document.getElementById("btn-export-img") as HTMLButtonElement;
   const exportDropdownMenu = document.getElementById("export-dropdown-menu") as HTMLDivElement;
@@ -130,6 +132,62 @@ document.addEventListener("DOMContentLoaded", () => {
     return null;
   }
 
+  // Collect all descendant attribute IDs for any parent nodes in rootIds
+  function getDescendantAttributeIds(rootIds: Set<string>): Set<string> {
+    const descendants = new Set<string>();
+    if (!parsedAST) return descendants;
+
+    function addAttrDescendants(prefixId: string, attr: any) {
+      const fullAttrId = `${prefixId}_attr_${attr.id}`;
+      descendants.add(fullAttrId);
+      if (attr.children && Array.isArray(attr.children)) {
+        for (const child of attr.children) {
+          descendants.add(`${fullAttrId}_child_${child.id}`);
+        }
+      }
+    }
+
+    for (const ent of parsedAST.entities || []) {
+      if (rootIds.has(ent.id)) {
+        for (const attr of ent.attributes || []) {
+          addAttrDescendants(ent.id, attr);
+        }
+      } else {
+        for (const attr of ent.attributes || []) {
+          const fullAttrId = `${ent.id}_attr_${attr.id}`;
+          if (rootIds.has(fullAttrId) || rootIds.has(attr.id)) {
+            if (attr.children && Array.isArray(attr.children)) {
+              for (const child of attr.children) {
+                descendants.add(`${fullAttrId}_child_${child.id}`);
+              }
+            }
+          }
+        }
+      }
+    }
+
+    for (const rel of parsedAST.relationships || []) {
+      if (rootIds.has(rel.id)) {
+        for (const attr of rel.attributes || []) {
+          addAttrDescendants(rel.id, attr);
+        }
+      } else {
+        for (const attr of rel.attributes || []) {
+          const fullAttrId = `${rel.id}_attr_${attr.id}`;
+          if (rootIds.has(fullAttrId) || rootIds.has(attr.id)) {
+            if (attr.children && Array.isArray(attr.children)) {
+              for (const child of attr.children) {
+                descendants.add(`${fullAttrId}_child_${child.id}`);
+              }
+            }
+          }
+        }
+      }
+    }
+
+    return descendants;
+  }
+
   // Marquee Selection State
   let isMarquee = false;
   let marqueeStartPt = { x: 0, y: 0 };
@@ -145,6 +203,7 @@ document.addEventListener("DOMContentLoaded", () => {
     type: string;
     parent?: string;
     initialOffset?: [number, number] | null;
+    isSatellite?: boolean;
   }
   let draggedNodes: DraggedNodeInfo[] = [];
 
@@ -886,7 +945,13 @@ document.addEventListener("DOMContentLoaded", () => {
 
             draggedNodes = [];
             const graph = layoutDiagram(parsedAST);
-            selectedIds.forEach(sId => {
+            
+            // Collect satellite attributes attached to dragged parents for smooth real-time cascade
+            const satelliteIds = getDescendantAttributeIds(selectedIds);
+            const allNodesToDrag = new Set(selectedIds);
+            satelliteIds.forEach(satId => allNodesToDrag.add(satId));
+
+            allNodesToDrag.forEach(sId => {
               const nodeEl = svgEl.querySelector(`.node-group[data-id="${sId}"]`) as SVGGElement;
               const nodePos = graph.nodes.get(sId);
               if (nodeEl && nodePos) {
@@ -904,12 +969,13 @@ document.addEventListener("DOMContentLoaded", () => {
                   initialY: nodePos.y,
                   type: nodePos.type,
                   parent: nodePos.parent,
-                  initialOffset
+                  initialOffset,
+                  isSatellite: !selectedIds.has(sId)
                 });
               }
             });
 
-            storeInitialConnectedLineCoordinatesForSelection(selectedIds);
+            storeInitialConnectedLineCoordinatesForSelection(allNodesToDrag);
           }
         } else if (activeTool === "attribute" && type !== "attribute" && type !== "specialization") {
           // Add attribute tool click on parent
@@ -1042,7 +1108,7 @@ document.addEventListener("DOMContentLoaded", () => {
         recordState();
         
         // Track moved parents to avoid double-offsetting child attributes
-        const movedParentIds = new Set(draggedNodes.filter(n => n.type !== "attribute").map(n => n.id));
+        const movedParentIds = new Set(draggedNodes.map(n => n.id));
         const currentGraph = layoutDiagram(parsedAST);
 
         for (const dn of draggedNodes) {
@@ -1064,16 +1130,28 @@ document.addEventListener("DOMContentLoaded", () => {
             const attrInfo = findAttributeByNodeId(dn.id);
             if (attrInfo) {
               const { attr, parentNodeId } = attrInfo;
-              if (attr.pos) {
-                attr.pos = { x: finalX, y: finalY };
-              } else if (!movedParentIds.has(parentNodeId)) {
-                const parentNode = currentGraph.nodes.get(parentNodeId);
-                const pX = parentNode ? parentNode.x : 0;
-                const pY = parentNode ? parentNode.y : 0;
-                attr.offset = [
-                  Math.round(finalX - pX),
-                  Math.round(finalY - pY)
-                ];
+              if (dn.isSatellite) {
+                // If the attribute was dragged as a satellite of its parent:
+                if (attr.pos) {
+                  attr.pos = {
+                    x: Math.round(dn.initialX + currentDx),
+                    y: Math.round(dn.initialY + currentDy)
+                  };
+                }
+                // If relative offset or dynamic placement, parent moved, so relative offset remains unchanged
+              } else {
+                // Attribute was directly dragged
+                if (attr.pos) {
+                  attr.pos = { x: finalX, y: finalY };
+                } else if (!movedParentIds.has(parentNodeId)) {
+                  const parentNode = currentGraph.nodes.get(parentNodeId);
+                  const pX = parentNode ? parentNode.x : 0;
+                  const pY = parentNode ? parentNode.y : 0;
+                  attr.offset = [
+                    Math.round(finalX - pX),
+                    Math.round(finalY - pY)
+                  ];
+                }
               }
             }
           }
@@ -1167,6 +1245,10 @@ document.addEventListener("DOMContentLoaded", () => {
     if (btnCopy) {
       btnCopy.textContent = t.header.copyCode;
       btnCopy.title = t.header.copyCode;
+    }
+    if (btnOpenNkm) {
+      btnOpenNkm.textContent = (t.header as any).openNkm || "Abrir .nkm";
+      btnOpenNkm.title = (t.header as any).openNkmTitle || "Abrir arquivo .nkm";
     }
     if (btnExportNkm) {
       btnExportNkm.textContent = t.header.exportNkm;
@@ -1843,6 +1925,58 @@ document.addEventListener("DOMContentLoaded", () => {
       }, 1500);
     });
   });
+
+  // Open / Import diagram DSL code from local .nkm file
+  function loadFileContent(file: File) {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const content = e.target?.result;
+      if (typeof content === "string") {
+        recordState();
+        editor.value = content;
+        compileDiagram();
+        const editorFileName = document.getElementById("editor-file-name");
+        if (editorFileName) {
+          editorFileName.textContent = file.name;
+        }
+      }
+    };
+    reader.onerror = () => {
+      alert("Falha ao ler o arquivo selecionado.");
+    };
+    reader.readAsText(file);
+  }
+
+  btnOpenNkm?.addEventListener("click", () => {
+    inputOpenNkm?.click();
+  });
+
+  inputOpenNkm?.addEventListener("change", () => {
+    if (inputOpenNkm.files && inputOpenNkm.files.length > 0) {
+      loadFileContent(inputOpenNkm.files[0]);
+      inputOpenNkm.value = ""; // allow reopening same file if modified externally
+    }
+  });
+
+  // Drag-and-drop support on editor panel for .nkm files
+  if (editorPanel) {
+    editorPanel.addEventListener("dragover", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+    });
+
+    editorPanel.addEventListener("drop", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+        const file = e.dataTransfer.files[0];
+        if (file.name.endsWith(".nkm") || file.name.endsWith(".txt") || file.type.includes("text")) {
+          loadFileContent(file);
+        }
+      }
+    });
+  }
 
   // Export diagram DSL code as .nkm file download
   btnExportNkm?.addEventListener("click", () => {
