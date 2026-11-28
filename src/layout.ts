@@ -458,6 +458,9 @@ export class DagreRadialLayoutEngine implements LayoutEngine {
         );
       };
 
+      // Spacing mode
+      const spacingMode = options.attribute_layout || ast.config.attribute_layout || "default";
+
       // Find all connection angles relative to this parent center to determine blocked sectors
       const blockedAngles: number[] = [];
       
@@ -475,6 +478,132 @@ export class DagreRadialLayoutEngine implements LayoutEngine {
           }
         }
       }
+
+      // Reusable helper for composite children
+      const placeCompositeChildren = (attr: Attribute, attrId: string, ax: number, ay: number, baseAngle: number) => {
+        if (!attr.isComposite || attr.children.length === 0) return;
+        const childRadius = 80;
+        const startAngle = baseAngle - Math.PI * 0.35;
+        const sizeAngle = Math.PI * 0.7;
+
+        for (let c = 0; c < attr.children.length; c++) {
+          const child = attr.children[c];
+          const childAngle = attr.children.length === 1
+            ? baseAngle
+            : startAngle + (sizeAngle * c) / (attr.children.length - 1);
+
+          let cx = ax + childRadius * Math.cos(childAngle);
+          let cy = ay + childRadius * Math.sin(childAngle);
+
+          if (child.pos) {
+            cx = child.pos.x;
+            cy = child.pos.y;
+          } else if (child.offset && spacingMode === "manual") {
+            cx = ax + child.offset[0];
+            cy = ay + child.offset[1];
+          }
+
+          const childId = `${attrId}_child_${child.id}`;
+
+          const childWidth = Math.max(75, child.id.length * 7.5 + 15);
+          nodes.set(childId, {
+            id: childId,
+            type: "attribute",
+            x: cx,
+            y: cy,
+            width: childWidth,
+            height: 35,
+            label: child.id,
+            parent: attrId,
+            attributeType: "regular",
+            offset: child.offset,
+            style: child.style
+          });
+          updateBounds(cx, cy, childWidth, 35);
+
+          edges.push({
+            from: attrId,
+            to: childId,
+            points: [
+              { x: ax, y: ay },
+              { x: cx, y: cy }
+            ],
+            cardinality: null,
+            participation: "partial",
+            role: null,
+            labelOffset: null,
+            style: null
+          });
+        }
+      };
+
+      // In manual mode (or when pos is provided), separate manual coordinates from unpositioned
+      const manualAttributes: { attr: Attribute; x: number; y: number }[] = [];
+      const dynamicAttrs: Attribute[] = [];
+
+      for (const attr of attrs) {
+        if (attr.pos) {
+          manualAttributes.push({ attr, x: attr.pos.x, y: attr.pos.y });
+        } else if (attr.offset && spacingMode === "manual") {
+          manualAttributes.push({
+            attr,
+            x: parentNode.x + attr.offset[0],
+            y: parentNode.y + attr.offset[1]
+          });
+        } else {
+          dynamicAttrs.push(attr);
+        }
+      }
+
+      // Place manual attributes immediately and add their angles to blockedAngles
+      for (const { attr, x: ax, y: ay } of manualAttributes) {
+        const attrWidth = Math.max(80, attr.id.length * 8 + 15);
+        const attrId = `${parentId}_attr_${attr.id}`;
+        const attrType = attr.isKey 
+          ? "key" 
+          : attr.isWeakKey 
+          ? "weak_key" 
+          : attr.isMultivalued 
+          ? "multivalued" 
+          : attr.isDerived 
+          ? "derived" 
+          : "regular";
+
+        nodes.set(attrId, {
+          id: attrId,
+          type: "attribute",
+          x: ax,
+          y: ay,
+          width: attrWidth,
+          height: 40,
+          label: attr.id,
+          parent: parentId,
+          attributeType: attrType,
+          offset: attr.offset,
+          style: attr.style
+        });
+        updateBounds(ax, ay, attrWidth, 40);
+
+        edges.push({
+          from: parentId,
+          to: attrId,
+          points: [
+            { x: parentNode.x, y: parentNode.y },
+            { x: ax, y: ay }
+          ],
+          cardinality: null,
+          participation: "partial",
+          role: null,
+          labelOffset: null,
+          style: null
+        });
+
+        const angleFromParent = Math.atan2(ay - parentNode.y, ax - parentNode.x);
+        placeCompositeChildren(attr, attrId, ax, ay, angleFromParent);
+        blockedAngles.push(angleFromParent);
+      }
+
+      if (dynamicAttrs.length === 0) return;
 
       // Sort and normalize blocked angles to [0, 2*PI]
       const sortedAngles = blockedAngles
@@ -497,16 +626,15 @@ export class DagreRadialLayoutEngine implements LayoutEngine {
         }
       }
 
-      // Distribute attributes among gaps proportionally to gap size
+      // Distribute dynamic attributes among gaps proportionally to gap size
       const totalGapSize = gaps.reduce((sum, g) => sum + g.size, 0);
       const allocatedCounts = gaps.map((gap) => {
-        return Math.max(0, Math.floor((attrs.length * gap.size) / totalGapSize));
+        return Math.max(0, Math.floor((dynamicAttrs.length * gap.size) / totalGapSize));
       });
 
-      // Adjust allocation counts to ensure sum === attrs.length
+      // Adjust allocation counts to ensure sum === dynamicAttrs.length
       let allocatedSum = allocatedCounts.reduce((a, b) => a + b, 0);
-      while (allocatedSum < attrs.length) {
-        // Find gap with largest remaining size fraction and add 1
+      while (allocatedSum < dynamicAttrs.length) {
         let maxIdx = -1;
         let maxSize = -1;
         for (let i = 0; i < gaps.length; i++) {
@@ -523,14 +651,13 @@ export class DagreRadialLayoutEngine implements LayoutEngine {
 
       // Place attributes in their allocated gaps
       let attrIdx = 0;
-      const spacingMode = options.attribute_layout || ast.config.attribute_layout || "default";
 
       for (let i = 0; i < gaps.length; i++) {
         const gap = gaps[i];
         const count = allocatedCounts[i];
         if (count === 0) continue;
 
-        const gapAttrs = attrs.slice(attrIdx, attrIdx + count);
+        const gapAttrs = dynamicAttrs.slice(attrIdx, attrIdx + count);
         attrIdx += count;
 
         // Partition into layers based on spacing mode
@@ -543,7 +670,7 @@ export class DagreRadialLayoutEngine implements LayoutEngine {
             layers.push({ r: attributeRadius + L * 35, attrs: slice });
           }
         } else {
-          // default and zigzag use dynamic capacity
+          // default, manual fallback and zigzag use dynamic capacity
           let currentLayer: Attribute[] = [];
           let L = 0;
           let r = (parentNode.width / 2 + parentNode.height / 2) / 2 + 50;
@@ -596,7 +723,6 @@ export class DagreRadialLayoutEngine implements LayoutEngine {
 
             let finalRadius = currentRadius;
             if (spacingMode !== "classic") {
-              // Calculate dynamic base radius clear of parent borders
               const parentBorderDist = getParentRadiusAtAngle(parentNode, angle);
               const dynamicBaseRadius = parentBorderDist + attrWidth / 2 + 10;
               finalRadius = dynamicBaseRadius + L * 35;
@@ -654,55 +780,7 @@ export class DagreRadialLayoutEngine implements LayoutEngine {
             });
 
             // Handle composite children
-            if (attr.isComposite && attr.children.length > 0) {
-              // Position child attributes in a larger sub-radial fan out from parent attribute
-              const childRadius = 80;
-              // Fan centered away from parent entity
-              const parentAngle = angle; 
-              const startAngle = parentAngle - Math.PI * 0.35;
-              const sizeAngle = Math.PI * 0.7;
-
-              for (let c = 0; c < attr.children.length; c++) {
-                const child = attr.children[c];
-                const childAngle = attr.children.length === 1
-                  ? parentAngle
-                  : startAngle + (sizeAngle * c) / (attr.children.length - 1);
-
-                const cx = ax + childRadius * Math.cos(childAngle);
-                const cy = ay + childRadius * Math.sin(childAngle);
-                const childId = `${attrId}_child_${child.id}`;
-
-                const childWidth = Math.max(75, child.id.length * 7.5 + 15);
-                nodes.set(childId, {
-                  id: childId,
-                  type: "attribute",
-                  x: cx,
-                  y: cy,
-                  width: childWidth,
-                  height: 35,
-                  label: child.id,
-                  parent: attrId,
-                  attributeType: "regular",
-                  offset: child.offset,
-                  style: child.style
-                });
-                updateBounds(cx, cy, childWidth, 35);
-
-                edges.push({
-                  from: attrId,
-                  to: childId,
-                  points: [
-                    { x: ax, y: ay },
-                    { x: cx, y: cy }
-                  ],
-                  cardinality: null,
-                  participation: "partial",
-                  role: null,
-                  labelOffset: null,
-                  style: null
-                });
-              }
-            }
+            placeCompositeChildren(attr, attrId, ax, ay, angle);
           }
         }
       }
@@ -721,10 +799,14 @@ export class DagreRadialLayoutEngine implements LayoutEngine {
     // Apply offset metadata translations (post-processing)
     for (const node of nodes.values()) {
       if (node.offset) {
-        node.x += node.offset[0];
-        node.y += node.offset[1];
-        // Re-evaluate bounding boxes with offsets
-        updateBounds(node.x, node.y, node.width, node.height);
+        const spacingMode = options.attribute_layout || ast.config.attribute_layout || "default";
+        const isManualAttr = node.type === "attribute" && spacingMode === "manual";
+        if (!isManualAttr) {
+          node.x += node.offset[0];
+          node.y += node.offset[1];
+          // Re-evaluate bounding boxes with offsets
+          updateBounds(node.x, node.y, node.width, node.height);
+        }
       }
     }
 
@@ -747,7 +829,10 @@ export class DagreRadialLayoutEngine implements LayoutEngine {
       const ent = ast.entities.find(e => e.id === n.id);
       const rel = ast.relationships.find(r => r.id === n.id);
       const spec = ast.specializations.find(s => s.id === n.id);
-      return (ent && ent.pos) || (rel && rel.pos) || (spec && spec.pos);
+      if ((ent && ent.pos) || (rel && rel.pos) || (spec && spec.pos)) return true;
+      if (ent && ent.attributes.some(a => a.pos || (a.children && a.children.some(c => c.pos)))) return true;
+      if (rel && rel.attributes.some(a => a.pos || (a.children && a.children.some(c => c.pos)))) return true;
+      return false;
     });
 
     const offsetX = hasAnyManualPos ? 0 : (minX === Infinity ? 0 : -minX + padding);

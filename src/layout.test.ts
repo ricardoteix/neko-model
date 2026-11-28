@@ -536,4 +536,68 @@ describe("Chen ER Layout Manager Tests", () => {
     expect(graph.width).toBeGreaterThan(100);
     expect(graph.height).toBeGreaterThan(100);
   });
+
+  test("Should place attributes accurately in manual attribute layout mode", () => {
+    const dsl = `
+      chenER
+      attribute_layout manual
+      entity Customer [pos: 200, 300] {
+        id key [offset: 50, -60]
+        email [pos: 450, 550]
+        fallback_attr
+      }
+    `;
+
+    const ast = parseDSL(dsl);
+    const graph = layoutDiagram(ast);
+
+    const customer = graph.nodes.get("Customer")!;
+    expect(customer.x).toBe(200);
+    expect(customer.y).toBe(300);
+
+    const idAttr = graph.nodes.get("Customer_attr_id")!;
+    // In manual mode with offset: parent.x + offset[0], parent.y + offset[1]
+    expect(idAttr.x).toBe(250);
+    expect(idAttr.y).toBe(240);
+    expect(idAttr.offset).toEqual([50, -60]);
+
+    const emailAttr = graph.nodes.get("Customer_attr_email")!;
+    // In manual mode with pos: exact pos coordinates
+    expect(emailAttr.x).toBe(450);
+    expect(emailAttr.y).toBe(550);
+
+    const fallbackAttr = graph.nodes.get("Customer_attr_fallback_attr")!;
+    // Fallback unpositioned attribute is placed without crashing
+    expect(fallbackAttr.x).toBeDefined();
+    expect(fallbackAttr.y).toBeDefined();
+    expect(Number.isFinite(fallbackAttr.x)).toBe(true);
+    expect(Number.isFinite(fallbackAttr.y)).toBe(true);
+  });
+
+  test("Should support manual offset on composite attributes", () => {
+    const dsl = `
+      chenER
+      attribute_layout manual
+      entity Customer [pos: 200, 300] {
+        address composite(street, number) [offset: 100, 50]
+      }
+    `;
+
+    const ast = parseDSL(dsl);
+    const graph = layoutDiagram(ast);
+
+    const addr = graph.nodes.get("Customer_attr_address")!;
+    expect(addr.x).toBe(300); // 200 + 100
+    expect(addr.y).toBe(350); // 300 + 50
+
+    const street = graph.nodes.get("Customer_attr_address_child_street")!;
+    expect(street).toBeDefined();
+    expect(Number.isFinite(street.x)).toBe(true);
+    expect(Number.isFinite(street.y)).toBe(true);
+
+    const num = graph.nodes.get("Customer_attr_address_child_number")!;
+    expect(num).toBeDefined();
+    expect(Number.isFinite(num.x)).toBe(true);
+    expect(Number.isFinite(num.y)).toBe(true);
+  });
 });

@@ -541,7 +541,8 @@ export class Parser {
       isComposite,
       children,
       offset: metadata.offset,
-      style: metadata.style
+      style: metadata.style,
+      pos: metadata.pos
     };
   }
 

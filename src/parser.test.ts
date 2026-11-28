@@ -286,4 +286,31 @@ describe("Chen ER DSL Parser Tests", () => {
     expect(ast.connections[0].participation).toBe("total");
     expect(ast.connections[0].cardinality).toBe("1");
   });
+
+  test("Should parse attribute_layout manual and pos metadata on attributes", () => {
+    const dsl = `
+      chenER
+      attribute_layout manual
+      entity Customer [pos: 100, 200] {
+        id key [offset: 0, -80]
+        email [pos: 150, 250]
+      }
+    `;
+
+    const ast = parseDSL(dsl);
+    expect(ast.config.attribute_layout).toBe("manual");
+    expect(ast.entities[0].attributes[0].offset).toEqual([0, -80]);
+    expect(ast.entities[0].attributes[1].pos).toEqual({ x: 150, y: 250 });
+  });
+
+  test("Should parse Portuguese layout_atributos manual", () => {
+    const dsl = `
+      chenER
+      layout_atributos manual
+      entidade Cliente
+    `;
+
+    const ast = parseDSL(dsl);
+    expect(ast.config.attribute_layout).toBe("manual");
+  });
 });

@@ -108,4 +108,26 @@ Places == Customer : "manages"`;
     expect(ast2.connections[0].cardinality).toBe("1");
     expect(ast2.connections[1].role).toBe("manages");
   });
+
+  test("Should serialize attribute pos and offset in manual layout mode", () => {
+    const dsl = `chenER
+attribute_layout manual
+
+entity Customer [pos: 100, 200] {
+  id key [offset: 0, -80]
+  email [pos: 150, 250]
+}`;
+
+    const ast = parseDSL(dsl);
+    const serialized = stringifyAST(ast);
+
+    expect(serialized).toContain("attribute_layout manual");
+    expect(serialized).toContain("id key [offset: 0, -80]");
+    expect(serialized).toContain("email [pos: 150, 250]");
+
+    const ast2 = parseDSL(serialized);
+    expect(ast2.config.attribute_layout).toBe("manual");
+    expect(ast2.entities[0].attributes[0].offset).toEqual([0, -80]);
+    expect(ast2.entities[0].attributes[1].pos).toEqual({ x: 150, y: 250 });
+  });
 });

@@ -574,6 +574,25 @@ body, html {
   pointer-events: none;
 }
 
+/* Selection Marquee Box */
+.selection-marquee {
+  fill: rgba(255, 90, 67, 0.12);
+  stroke: #FF5A43;
+  stroke-width: 1.5;
+  stroke-dasharray: 4, 3;
+  pointer-events: none;
+}
+
+/* Canvas Pan Cursors */
+.canvas-container.tool-pan {
+  cursor: grab !important;
+}
+
+.canvas-container.tool-pan:active,
+.canvas-container.is-panning {
+  cursor: grabbing !important;
+}
+
 /* Mobile Responsiveness */
 @media (max-width: 768px) {
   .workspace {

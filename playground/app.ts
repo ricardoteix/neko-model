@@ -40,6 +40,7 @@ document.addEventListener("DOMContentLoaded", () => {
   let isPanning = false;
   let panStartX = 0;
   let panStartY = 0;
+  let isSpacePressed = false;
 
   // Undo/Redo Stacks
   const undoStack: string[] = [];
@@ -53,31 +54,92 @@ document.addEventListener("DOMContentLoaded", () => {
   let selectedEdge: { from: string; to: string } | null = null;
   let parsedAST: any = null;
 
-  interface DraggedLine {
+  function findAttributeByNodeId(nodeId: string): { 
+    attr: Attribute; 
+    parentEntityOrRel: any; 
+    parentAttr?: Attribute;
+    parentNodeId: string; 
+  } | null {
+    if (!parsedAST) return null;
+    for (const ent of parsedAST.entities) {
+      for (const attr of ent.attributes) {
+        const fullId = `${ent.id}_attr_${attr.id}`;
+        if (nodeId === fullId || nodeId === attr.id) {
+          return { attr, parentEntityOrRel: ent, parentNodeId: ent.id };
+        }
+        if (attr.children) {
+          for (const child of attr.children) {
+            const childFullId = `${fullId}_child_${child.id}`;
+            if (nodeId === childFullId || nodeId === child.id) {
+              return { attr: child, parentEntityOrRel: ent, parentAttr: attr, parentNodeId: fullId };
+            }
+          }
+        }
+      }
+    }
+    for (const rel of parsedAST.relationships) {
+      for (const attr of rel.attributes) {
+        const fullId = `${rel.id}_attr_${attr.id}`;
+        if (nodeId === fullId || nodeId === attr.id) {
+          return { attr, parentEntityOrRel: rel, parentNodeId: rel.id };
+        }
+        if (attr.children) {
+          for (const child of attr.children) {
+            const childFullId = `${fullId}_child_${child.id}`;
+            if (nodeId === childFullId || nodeId === child.id) {
+              return { attr: child, parentEntityOrRel: rel, parentAttr: attr, parentNodeId: fullId };
+            }
+          }
+        }
+      }
+    }
+    return null;
+  }
+
+  // Marquee Selection State
+  let isMarquee = false;
+  let marqueeStartPt = { x: 0, y: 0 };
+  let marqueeRectEl: SVGRectElement | null = null;
+  let marqueeInitialSelectedIds = new Set<string>();
+
+  // Multi-drag State
+  interface DraggedNodeInfo {
+    id: string;
+    group: SVGGElement;
+    initialX: number;
+    initialY: number;
+    type: string;
+    parent?: string;
+    initialOffset?: [number, number] | null;
+  }
+  let draggedNodes: DraggedNodeInfo[] = [];
+
+  interface DraggedEdgeInfo {
     element: SVGLineElement;
-    isFrom: boolean;
+    from: string;
+    to: string;
     x1: number;
     y1: number;
     x2: number;
     y2: number;
+    isFromDragged: boolean;
+    isToDragged: boolean;
+    isInternal: boolean;
   }
-  interface DraggedText {
+  let multiDraggedLines: DraggedEdgeInfo[] = [];
+
+  interface DraggedTextInfo {
     element: SVGTextElement;
-    x: number;
-    y: number;
-    isFrom: boolean;
-    oppositeX: number;
-    oppositeY: number;
-    pushX: number;
-    pushY: number;
+    from: string;
+    to: string;
+    initialX: number;
+    initialY: number;
+    isInternal: boolean;
+    isFromDragged: boolean;
   }
+  let multiDraggedTexts: DraggedTextInfo[] = [];
 
-  let draggedLines: DraggedLine[] = [];
-  let draggedTexts: DraggedText[] = [];
-
-  // Drag-and-Drop Variables
   let isDragging = false;
-  let dragGroup: SVGGElement | null = null;
   let dragId = "";
   let dragType = "";
   let dragStartX = 0;
@@ -177,6 +239,11 @@ document.addEventListener("DOMContentLoaded", () => {
       // Add zoom state to newly rendered SVG
       applyTransform();
       
+      // Sync spacingSelect dropdown if specified in AST
+      if (parsedAST && parsedAST.config && parsedAST.config.attribute_layout) {
+        spacingSelect.value = parsedAST.config.attribute_layout;
+      }
+
       // Bind event listeners to new SVG elements
       bindCanvasEvents();
 
@@ -222,8 +289,9 @@ document.addEventListener("DOMContentLoaded", () => {
     const lines = newCode.split("\n");
     if (lines[0] === "chenER") {
       const layoutVal = spacingSelect.value;
-      if (layoutVal !== "default" && !newCode.includes("attribute_layout")) {
-        lines.splice(1, 0, `attribute_layout ${layoutVal}`);
+      if (layoutVal && !newCode.includes("attribute_layout") && !newCode.includes("layout_atributos")) {
+        const isPt = getLanguage() === "pt-br";
+        lines.splice(1, 0, isPt ? `layout_atributos ${layoutVal}` : `attribute_layout ${layoutVal}`);
       }
     }
     
@@ -250,7 +318,14 @@ document.addEventListener("DOMContentLoaded", () => {
     compileDiagram();
   });
   updateBodyThemeClass();
-  spacingSelect.addEventListener("change", () => compileDiagram());
+  spacingSelect.addEventListener("change", () => {
+    if (parsedAST) {
+      parsedAST.config.attribute_layout = spacingSelect.value;
+      serializeAndSync();
+    } else {
+      compileDiagram();
+    }
+  });
 
   if (selectSnapSize) {
     selectSnapSize.addEventListener("change", () => {
@@ -284,28 +359,72 @@ document.addEventListener("DOMContentLoaded", () => {
       btn.classList.add("active");
       activeTool = btn.getAttribute("data-tool") || "select";
       
+      if (activeTool === "pan") {
+        preview.style.cursor = "grab";
+        preview.parentElement?.classList.add("tool-pan");
+      } else {
+        preview.style.cursor = "default";
+        preview.parentElement?.classList.remove("tool-pan");
+      }
+
       // Reset selected states if adding new items
-      if (activeTool !== "select") {
+      if (activeTool !== "select" && activeTool !== "pan") {
         clearSelection();
       }
     });
   });
 
-  // Escape key cancels current tool or dragging
-  document.addEventListener("keydown", (e) => {
-    if (e.key === "Escape") {
+  // Spacebar and Tool Keyboard Shortcuts
+  window.addEventListener("keydown", (e: KeyboardEvent) => {
+    const target = e.target as HTMLElement;
+    if (target.nodeName === "INPUT" || target.nodeName === "TEXTAREA" || target.isContentEditable) {
+      return;
+    }
+
+    if (e.code === "Space" && !isSpacePressed) {
+      isSpacePressed = true;
+      preview.style.cursor = "grab";
+      preview.parentElement?.classList.add("tool-pan");
+      e.preventDefault();
+    } else if (e.key === "h" || e.key === "H") {
+      toolBtns.forEach(b => b.classList.remove("active"));
+      const panBtn = document.querySelector('[data-tool="pan"]') as HTMLButtonElement;
+      if (panBtn) panBtn.classList.add("active");
+      activeTool = "pan";
+      preview.style.cursor = "grab";
+      preview.parentElement?.classList.add("tool-pan");
+    } else if (e.key === "v" || e.key === "V" || e.key === "Escape") {
       toolBtns.forEach(b => b.classList.remove("active"));
       const selectBtn = document.querySelector('[data-tool="select"]') as HTMLButtonElement;
       if (selectBtn) selectBtn.classList.add("active");
       activeTool = "select";
+      preview.style.cursor = "default";
+      preview.parentElement?.classList.remove("tool-pan");
       
       if (isDrawingLink && guideLine) {
         guideLine.remove();
         guideLine = null;
         isDrawingLink = false;
       }
+      if (isMarquee && marqueeRectEl) {
+        marqueeRectEl.remove();
+        marqueeRectEl = null;
+        isMarquee = false;
+      }
       isDragging = false;
-      clearSelection();
+      if (e.key === "Escape") {
+        clearSelection();
+      }
+    }
+  });
+
+  window.addEventListener("keyup", (e: KeyboardEvent) => {
+    if (e.code === "Space" && isSpacePressed) {
+      isSpacePressed = false;
+      if (activeTool !== "pan") {
+        preview.style.cursor = "default";
+        preview.parentElement?.classList.remove("tool-pan");
+      }
     }
   });
 
@@ -335,14 +454,12 @@ document.addEventListener("DOMContentLoaded", () => {
             parsedAST.specializations = parsedAST.specializations.filter((s: any) => s.id !== id);
             parsedAST.connections = parsedAST.connections.filter((c: any) => c.from !== id && c.to !== id);
           } else {
-            if (id.includes("_attr_")) {
-              const parts = id.split("_attr_");
-              const parentId = parts[0];
-              const attrId = parts[1];
-              const parent = parsedAST.entities.find((x: any) => x.id === parentId) || 
-                             parsedAST.relationships.find((x: any) => x.id === parentId);
-              if (parent) {
-                parent.attributes = parent.attributes.filter((a: any) => a.id !== attrId);
+            const attrInfo = findAttributeByNodeId(id);
+            if (attrInfo) {
+              if (attrInfo.parentAttr && attrInfo.parentAttr.children) {
+                attrInfo.parentAttr.children = attrInfo.parentAttr.children.filter((c: any) => c.id !== attrInfo.attr.id);
+              } else if (attrInfo.parentEntityOrRel && attrInfo.parentEntityOrRel.attributes) {
+                attrInfo.parentEntityOrRel.attributes = attrInfo.parentEntityOrRel.attributes.filter((a: any) => a.id !== attrInfo.attr.id);
               }
             }
           }
@@ -400,91 +517,86 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  // Store initial coordinates of lines and labels connected to the dragged node
-  function storeInitialConnectedLineCoordinates(nodeId: string) {
-    draggedLines = [];
-    draggedTexts = [];
+  // Store initial coordinates of lines and labels connected to all dragged nodes in selectedIds
+  function storeInitialConnectedLineCoordinatesForSelection(nodeIds: Set<string>) {
+    multiDraggedLines = [];
+    multiDraggedTexts = [];
     
     const svgEl = preview.querySelector("svg");
     if (!svgEl) return;
 
-    const edges = svgEl.querySelectorAll(`.edge-group[data-from="${nodeId}"], .edge-group[data-to="${nodeId}"]`);
-    
-    edges.forEach(edgeGroup => {
-      const from = edgeGroup.getAttribute("data-from") || "";
-      const to = edgeGroup.getAttribute("data-to") || "";
-      const isFrom = (from === nodeId);
-      const oppositeId = isFrom ? to : from;
+    const seenEdges = new Set<SVGElement>();
+
+    nodeIds.forEach(nodeId => {
+      const edges = svgEl.querySelectorAll(`.edge-group[data-from="${nodeId}"], .edge-group[data-to="${nodeId}"]`);
       
-      const oppositeNode = svgEl.querySelector(`.node-group[data-id="${oppositeId}"]`);
-      let oppositeX = 0;
-      let oppositeY = 0;
-      if (oppositeNode) {
-        const transform = oppositeNode.getAttribute("transform") || "";
-        const match = transform.match(/translate\(([-\d.]+),\s*([-\d.]+)\)/);
-        if (match) {
-          oppositeX = parseFloat(match[1]);
-          oppositeY = parseFloat(match[2]);
-        }
-      }
-      
-      edgeGroup.querySelectorAll("line").forEach((line: SVGLineElement) => {
-        draggedLines.push({
-          element: line,
-          isFrom,
-          x1: parseFloat(line.getAttribute("x1") || "0"),
-          y1: parseFloat(line.getAttribute("y1") || "0"),
-          x2: parseFloat(line.getAttribute("x2") || "0"),
-          y2: parseFloat(line.getAttribute("y2") || "0")
-        });
-      });
-      
-      edgeGroup.querySelectorAll("text").forEach((text: SVGTextElement) => {
-        const x = parseFloat(text.getAttribute("x") || "0");
-        const y = parseFloat(text.getAttribute("y") || "0");
+      edges.forEach(edgeGroup => {
+        if (seenEdges.has(edgeGroup as SVGElement)) return;
+        seenEdges.add(edgeGroup as SVGElement);
+
+        const from = edgeGroup.getAttribute("data-from") || "";
+        const to = edgeGroup.getAttribute("data-to") || "";
+        const isFromDragged = nodeIds.has(from);
+        const isToDragged = nodeIds.has(to);
+        const isInternal = isFromDragged && isToDragged;
         
-        const line = edgeGroup.querySelector("line");
-        if (line) {
-          const lx1 = parseFloat(line.getAttribute("x1") || "0");
-          const ly1 = parseFloat(line.getAttribute("y1") || "0");
-          const lx2 = parseFloat(line.getAttribute("x2") || "0");
-          const ly2 = parseFloat(line.getAttribute("y2") || "0");
-          
-          const mx = (lx1 + lx2) / 2;
-          const my = (ly1 + ly2) / 2;
-          
-          draggedTexts.push({
-            element: text,
-            x,
-            y,
-            isFrom,
-            oppositeX,
-            oppositeY,
-            pushX: x - mx,
-            pushY: y - my
+        edgeGroup.querySelectorAll("line").forEach((line: SVGLineElement) => {
+          multiDraggedLines.push({
+            element: line,
+            from,
+            to,
+            x1: parseFloat(line.getAttribute("x1") || "0"),
+            y1: parseFloat(line.getAttribute("y1") || "0"),
+            x2: parseFloat(line.getAttribute("x2") || "0"),
+            y2: parseFloat(line.getAttribute("y2") || "0"),
+            isFromDragged,
+            isToDragged,
+            isInternal
           });
-        }
+        });
+        
+        edgeGroup.querySelectorAll("text").forEach((text: SVGTextElement) => {
+          const x = parseFloat(text.getAttribute("x") || "0");
+          const y = parseFloat(text.getAttribute("y") || "0");
+          multiDraggedTexts.push({
+            element: text,
+            from,
+            to,
+            initialX: x,
+            initialY: y,
+            isInternal,
+            isFromDragged
+          });
+        });
       });
     });
   }
 
   // Update line and label positions during mousemove drag
   function updateConnectedLinesDuringDrag(dx: number, dy: number) {
-    for (const dl of draggedLines) {
-      if (dl.isFrom) {
+    for (const dl of multiDraggedLines) {
+      if (dl.isInternal) {
         dl.element.setAttribute("x1", (dl.x1 + dx).toString());
         dl.element.setAttribute("y1", (dl.y1 + dy).toString());
-      } else {
+        dl.element.setAttribute("x2", (dl.x2 + dx).toString());
+        dl.element.setAttribute("y2", (dl.y2 + dy).toString());
+      } else if (dl.isFromDragged) {
+        dl.element.setAttribute("x1", (dl.x1 + dx).toString());
+        dl.element.setAttribute("y1", (dl.y1 + dy).toString());
+      } else if (dl.isToDragged) {
         dl.element.setAttribute("x2", (dl.x2 + dx).toString());
         dl.element.setAttribute("y2", (dl.y2 + dy).toString());
       }
     }
     
-    for (const dt of draggedTexts) {
-      const newX = dt.x + dx / 2;
-      const newY = dt.y + dy / 2;
-      dt.element.setAttribute("x", newX.toString());
-      dt.element.setAttribute("y", newY.toString());
+    for (const dt of multiDraggedTexts) {
+      if (dt.isInternal) {
+        dt.element.setAttribute("x", (dt.initialX + dx).toString());
+        dt.element.setAttribute("y", (dt.initialY + dy).toString());
+      } else {
+        dt.element.setAttribute("x", (dt.initialX + dx / 2).toString());
+        dt.element.setAttribute("y", (dt.initialY + dy / 2).toString());
+      }
     }
   }
 
@@ -502,6 +614,62 @@ document.addEventListener("DOMContentLoaded", () => {
     return { x: svgPoint.x, y: svgPoint.y };
   }
 
+  // Calculate a smart initial offset for newly created attributes to freeze in manual mode
+  function computeInitialAttributeOffset(parent: any, ast: any): [number, number] {
+    const graph = layoutDiagram(ast);
+    const parentNode = graph.nodes.get(parent.id);
+    if (!parentNode) return [0, -85];
+
+    const occupiedAngles: number[] = [];
+
+    // Edges connected to parent
+    for (const edge of graph.edges) {
+      if (edge.from === parent.id) {
+        const target = graph.nodes.get(edge.to);
+        if (target) occupiedAngles.push(Math.atan2(target.y - parentNode.y, target.x - parentNode.x));
+      } else if (edge.to === parent.id) {
+        const source = graph.nodes.get(edge.from);
+        if (source) occupiedAngles.push(Math.atan2(source.y - parentNode.y, source.x - parentNode.x));
+      }
+    }
+
+    // Existing attributes of parent
+    if (parent.attributes) {
+      for (const a of parent.attributes) {
+        const attrNode = graph.nodes.get(`${parent.id}_attr_${a.id}`);
+        if (attrNode) {
+          occupiedAngles.push(Math.atan2(attrNode.y - parentNode.y, attrNode.x - parentNode.x));
+        } else if (a.offset) {
+          occupiedAngles.push(Math.atan2(a.offset[1], a.offset[0]));
+        }
+      }
+    }
+
+    // Normalize occupied angles to [0, 2*PI]
+    const sorted = occupiedAngles.map(a => a < 0 ? a + 2 * Math.PI : a).sort((a, b) => a - b);
+    let bestAngle = -Math.PI / 2; // Default upwards
+
+    if (sorted.length === 0) {
+      bestAngle = -Math.PI / 2;
+    } else {
+      let maxGap = 0;
+      for (let i = 0; i < sorted.length; i++) {
+        const start = sorted[i];
+        const end = i === sorted.length - 1 ? sorted[0] + 2 * Math.PI : sorted[i + 1];
+        const gap = end - start;
+        if (gap > maxGap) {
+          maxGap = gap;
+          bestAngle = start + gap / 2;
+        }
+      }
+    }
+
+    const baseR = (parentNode.width / 2 + parentNode.height / 2) / 2 + 55;
+    const dx = Math.round(baseR * Math.cos(bestAngle));
+    const dy = Math.round(baseR * Math.sin(bestAngle));
+    return [dx, dy];
+  }
+
   // Bind Mouse & Drag Events to SVG Canvas Elements
   function bindCanvasEvents() {
     const svgEl = preview.querySelector("svg");
@@ -516,7 +684,7 @@ document.addEventListener("DOMContentLoaded", () => {
         return;
       }
 
-      if (activeTool !== "select") {
+      if (activeTool !== "select" && activeTool !== "pan") {
         recordState();
         const pt = getSVGPoint(e);
         const uniqueNum = Date.now().toString().slice(-4);
@@ -559,15 +727,39 @@ document.addEventListener("DOMContentLoaded", () => {
         activeTool = "select";
 
         serializeAndSync();
-      } else {
+      } else if (activeTool === "pan" || isSpacePressed || e.button === 1) {
         // Handle canvas background drag panning initialization
-        if (target === svgEl || target.id === "viewport-g" || target.classList.contains("grid-background") || target.nodeName === "svg") {
-          isPanning = true;
-          panStartX = e.clientX - panX;
-          panStartY = e.clientY - panY;
-          preview.style.cursor = "grabbing";
-          e.preventDefault();
+        isPanning = true;
+        panStartX = e.clientX - panX;
+        panStartY = e.clientY - panY;
+        preview.parentElement?.classList.add("is-panning");
+        preview.style.cursor = "grabbing";
+        e.preventDefault();
+      } else if (activeTool === "select") {
+        // Start Marquee Selection Box
+        isMarquee = true;
+        const pt = getSVGPoint(e);
+        marqueeStartPt = pt;
+        marqueeInitialSelectedIds = e.shiftKey ? new Set(selectedIds) : new Set();
+
+        if (!e.shiftKey) {
+          selectedIds.clear();
+          selectedId = null;
+          selectedType = null;
+          updateVisualSelection();
+          renderInspector();
         }
+
+        marqueeRectEl = document.createElementNS("http://www.w3.org/2000/svg", "rect") as SVGRectElement;
+        marqueeRectEl.setAttribute("class", "selection-marquee");
+        marqueeRectEl.setAttribute("x", pt.x.toString());
+        marqueeRectEl.setAttribute("y", pt.y.toString());
+        marqueeRectEl.setAttribute("width", "0");
+        marqueeRectEl.setAttribute("height", "0");
+
+        const container = svgEl.querySelector("#viewport-g") || svgEl;
+        container.appendChild(marqueeRectEl);
+        e.preventDefault();
       }
     });
 
@@ -581,6 +773,17 @@ document.addEventListener("DOMContentLoaded", () => {
         e.stopPropagation();
         const target = e.target as SVGElement;
         
+        // If in Pan tool or spacebar held, allow canvas panning even when clicking nodes
+        if (activeTool === "pan" || isSpacePressed || e.button === 1) {
+          isPanning = true;
+          panStartX = e.clientX - panX;
+          panStartY = e.clientY - panY;
+          preview.parentElement?.classList.add("is-panning");
+          preview.style.cursor = "grabbing";
+          e.preventDefault();
+          return;
+        }
+
         // Check if clicking on connection port handle
         if (target.classList.contains("conn-port")) {
           isDrawingLink = true;
@@ -626,24 +829,56 @@ document.addEventListener("DOMContentLoaded", () => {
               selectedType = type;
             }
           } else {
-            selectedIds.clear();
-            selectedIds.add(id);
-            selectedId = id;
-            selectedType = type;
+            // If clicking on a node that is NOT in the selection, clear and select it.
+            // If clicking on a node that IS ALREADY in the selection, KEEP multi-selection intact!
+            if (!selectedIds.has(id)) {
+              selectedIds.clear();
+              selectedIds.add(id);
+              selectedId = id;
+              selectedType = type;
+            }
           }
           selectedEdge = null;
           updateVisualSelection();
           renderInspector();
 
-          isDragging = true;
-          dragGroup = nodeGroup;
-          dragId = id;
-          dragType = type;
-          dragStartX = e.clientX;
-          dragStartY = e.clientY;
-          currentDx = 0;
-          currentDy = 0;
-          storeInitialConnectedLineCoordinates(id);
+          // Initialize group dragging
+          if (selectedIds.size > 0) {
+            isDragging = true;
+            dragId = id;
+            dragType = type;
+            dragStartX = e.clientX;
+            dragStartY = e.clientY;
+            currentDx = 0;
+            currentDy = 0;
+
+            draggedNodes = [];
+            const graph = layoutDiagram(parsedAST);
+            selectedIds.forEach(sId => {
+              const nodeEl = svgEl.querySelector(`.node-group[data-id="${sId}"]`) as SVGGElement;
+              const nodePos = graph.nodes.get(sId);
+              if (nodeEl && nodePos) {
+                let initialOffset: [number, number] | null = null;
+                if (nodePos.type === "attribute") {
+                  const attrInfo = findAttributeByNodeId(sId);
+                  if (attrInfo && attrInfo.attr.offset) {
+                    initialOffset = [attrInfo.attr.offset[0], attrInfo.attr.offset[1]];
+                  }
+                }
+                draggedNodes.push({
+                  id: sId,
+                  group: nodeEl,
+                  initialX: nodePos.x,
+                  initialY: nodePos.y,
+                  type: nodePos.type,
+                  parent: nodePos.parent,
+                  initialOffset
+                });
+              }
+            });
+
+            storeInitialConnectedLineCoordinatesForSelection(selectedIds);
+          }
         } else if (activeTool === "attribute" && type !== "attribute" && type !== "specialization") {
           // Add attribute tool click on parent
           recordState();
@@ -651,6 +886,7 @@ document.addEventListener("DOMContentLoaded", () => {
           const parent = parsedAST.entities.find((x: any) => x.id === id) || 
                          parsedAST.relationships.find((x: any) => x.id === id);
           if (parent) {
+            const initialOffset = computeInitialAttributeOffset(parent, parsedAST);
             parent.attributes.push({
               id: `attr_${uniqueNum}`,
               isKey: false,
@@ -659,7 +895,7 @@ document.addEventListener("DOMContentLoaded", () => {
               isDerived: false,
               isComposite: false,
               children: [],
-              offset: null,
+              offset: initialOffset,
               style: null
             });
             serializeAndSync();
@@ -687,29 +923,68 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // Global mouse move Listener for drag translations and link guide lines
   window.addEventListener("mousemove", (e: MouseEvent) => {
-    if (isDragging && dragGroup) {
+    if (isDragging && draggedNodes.length > 0) {
       const rawDx = (e.clientX - dragStartX) / currentZoom;
       const rawDy = (e.clientY - dragStartY) / currentZoom;
       
-      const graph = layoutDiagram(parsedAST);
-      const positioned = graph.nodes.get(dragId);
-      if (positioned) {
-        const rawX = positioned.x + rawDx;
-        const rawY = positioned.y + rawDy;
+      const anchorNode = draggedNodes.find(n => n.id === dragId) || draggedNodes[0];
+      if (anchorNode) {
+        const rawX = anchorNode.initialX + rawDx;
+        const rawY = anchorNode.initialY + rawDy;
         const snappedX = snapVal(rawX);
         const snappedY = snapVal(rawY);
         
-        currentDx = snappedX - positioned.x;
-        currentDy = snappedY - positioned.y;
+        currentDx = snappedX - anchorNode.initialX;
+        currentDy = snappedY - anchorNode.initialY;
       } else {
         currentDx = snapVal(rawDx);
         currentDy = snapVal(rawDy);
       }
       
-      dragGroup.setAttribute("transform", `translate(${currentDx}, ${currentDy})`);
+      for (const dn of draggedNodes) {
+        dn.group.setAttribute("transform", `translate(${currentDx}, ${currentDy})`);
+      }
       updateConnectedLinesDuringDrag(currentDx, currentDy);
     }
     
+    if (isMarquee && marqueeRectEl) {
+      const pt = getSVGPoint(e);
+      const minX = Math.min(marqueeStartPt.x, pt.x);
+      const minY = Math.min(marqueeStartPt.y, pt.y);
+      const width = Math.abs(pt.x - marqueeStartPt.x);
+      const height = Math.abs(pt.y - marqueeStartPt.y);
+
+      marqueeRectEl.setAttribute("x", minX.toString());
+      marqueeRectEl.setAttribute("y", minY.toString());
+      marqueeRectEl.setAttribute("width", width.toString());
+      marqueeRectEl.setAttribute("height", height.toString());
+
+      // Check intersections with node bounding boxes
+      const graph = layoutDiagram(parsedAST);
+      const newSelected = new Set(marqueeInitialSelectedIds);
+
+      graph.nodes.forEach((node, id) => {
+        const nodeMinX = node.x - node.width / 2;
+        const nodeMaxX = node.x + node.width / 2;
+        const nodeMinY = node.y - node.height / 2;
+        const nodeMaxY = node.y + node.height / 2;
+
+        const intersects = !(nodeMaxX < minX || nodeMinX > minX + width || nodeMaxY < minY || nodeMinY > minY + height);
+        if (intersects) {
+          newSelected.add(id);
+        }
+      });
+
+      selectedIds.clear();
+      newSelected.forEach(id => selectedIds.add(id));
+      if (selectedIds.size > 0 && (!selectedId || !selectedIds.has(selectedId))) {
+        selectedId = Array.from(selectedIds)[0];
+        const n = graph.nodes.get(selectedId);
+        selectedType = n ? n.type : null;
+      }
+      updateVisualSelection();
+    }
+
     if (isDrawingLink && guideLine) {
       const pt = getSVGPoint(e);
       guideLine.setAttribute("x2", pt.x.toString());
@@ -725,51 +1000,63 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // Global mouse up Listener to finalize drags and links
   window.addEventListener("mouseup", (e: MouseEvent) => {
-    if (isDragging && dragGroup) {
+    if (isDragging && draggedNodes.length > 0) {
       isDragging = false;
-      dragGroup.removeAttribute("transform");
+      for (const dn of draggedNodes) {
+        dn.group.removeAttribute("transform");
+      }
       
       if (Math.abs(currentDx) > 1 || Math.abs(currentDy) > 1) {
         recordState();
         
-        // Retrieve layout positions to offset
-        const graph = layoutDiagram(parsedAST);
-        const positioned = graph.nodes.get(dragId);
-        
-        if (positioned) {
-          const finalX = snapVal(positioned.x + currentDx);
-          const finalY = snapVal(positioned.y + currentDy);
+        // Track moved parents to avoid double-offsetting child attributes
+        const movedParentIds = new Set(draggedNodes.filter(n => n.type !== "attribute").map(n => n.id));
+        const currentGraph = layoutDiagram(parsedAST);
+
+        for (const dn of draggedNodes) {
+          const finalX = snapVal(dn.initialX + currentDx);
+          const finalY = snapVal(dn.initialY + currentDy);
 
           // Update position in AST
-          const ent = parsedAST.entities.find((n: any) => n.id === dragId);
+          const ent = parsedAST.entities.find((n: any) => n.id === dn.id);
           if (ent) ent.pos = { x: finalX, y: finalY };
 
-          const rel = parsedAST.relationships.find((n: any) => n.id === dragId);
+          const rel = parsedAST.relationships.find((n: any) => n.id === dn.id);
           if (rel) rel.pos = { x: finalX, y: finalY };
 
-          const spec = parsedAST.specializations.find((n: any) => n.id === dragId);
+          const spec = parsedAST.specializations.find((n: any) => n.id === dn.id);
           if (spec) spec.pos = { x: finalX, y: finalY };
 
-          // Handle attribute offset dragging
-          if (dragType === "attribute" && positioned.parent) {
-            const parent = parsedAST.entities.find((n: any) => n.id === positioned.parent) || 
-                           parsedAST.relationships.find((n: any) => n.id === positioned.parent);
-            if (parent) {
-              const attr = parent.attributes.find((a: any) => a.id === dragId);
-              if (attr) {
-                const currOffset = attr.offset || [0, 0];
+          // Handle attribute dragging
+          if (dn.type === "attribute") {
+            const attrInfo = findAttributeByNodeId(dn.id);
+            if (attrInfo) {
+              const { attr, parentNodeId } = attrInfo;
+              if (attr.pos) {
+                attr.pos = { x: finalX, y: finalY };
+              } else if (!movedParentIds.has(parentNodeId)) {
+                const parentNode = currentGraph.nodes.get(parentNodeId);
+                const pX = parentNode ? parentNode.x : 0;
+                const pY = parentNode ? parentNode.y : 0;
                 attr.offset = [
-                  Math.round(currOffset[0] + currentDx),
-                  Math.round(currOffset[1] + currentDy)
+                  Math.round(finalX - pX),
+                  Math.round(finalY - pY)
                 ];
               }
             }
           }
-
-          serializeAndSync();
         }
+
+        serializeAndSync();
       }
-      dragGroup = null;
+      draggedNodes = [];
+    }
+
+    if (isMarquee && marqueeRectEl) {
+      marqueeRectEl.remove();
+      marqueeRectEl = null;
+      isMarquee = false;
+      renderInspector();
     }
 
     if (isDrawingLink && guideLine) {
@@ -802,7 +1089,12 @@ document.addEventListener("DOMContentLoaded", () => {
 
     if (isPanning) {
       isPanning = false;
-      preview.style.cursor = "grab";
+      preview.parentElement?.classList.remove("is-panning");
+      if (activeTool === "pan" || isSpacePressed) {
+        preview.style.cursor = "grab";
+      } else {
+        preview.style.cursor = "default";
+      }
     }
   });
 
@@ -831,6 +1123,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const lblSpacing = document.getElementById("lbl-spacing-select");
     if (lblSpacing) lblSpacing.textContent = t.header.spacingLabel;
+    const optSpManual = document.getElementById("opt-spacing-manual");
+    if (optSpManual) optSpManual.textContent = (t.header as any).spacingManual || "Manual (Padrão)";
     const optSpDefault = document.getElementById("opt-spacing-default");
     if (optSpDefault) optSpDefault.textContent = t.header.spacingDefault;
     const optSpZigzag = document.getElementById("opt-spacing-zigzag");
@@ -859,6 +1153,11 @@ document.addEventListener("DOMContentLoaded", () => {
     if (toolBtnSelect) toolBtnSelect.title = t.toolbox.selectTitle;
     const toolLblSelect = document.getElementById("tool-lbl-select");
     if (toolLblSelect) toolLblSelect.textContent = t.toolbox.select;
+
+    const toolBtnPan = document.getElementById("tool-btn-pan");
+    if (toolBtnPan) toolBtnPan.title = (t.toolbox as any).panTitle || "Ferramenta de Mover / Pan (H)";
+    const toolLblPan = document.getElementById("tool-lbl-pan");
+    if (toolLblPan) toolLblPan.textContent = (t.toolbox as any).pan || "Mover";
 
     const toolBtnEntity = document.getElementById("tool-btn-entity");
     if (toolBtnEntity) toolBtnEntity.title = t.toolbox.entityTitle;
@@ -1002,6 +1301,7 @@ document.addEventListener("DOMContentLoaded", () => {
         document.getElementById("btn-add-attr-panel")?.addEventListener("click", () => {
           recordState();
           const uniqueNum = Date.now().toString().slice(-3);
+          const initialOffset = computeInitialAttributeOffset(ent, parsedAST);
           ent.attributes.push({
             id: `attr_${uniqueNum}`,
             isKey: false,
@@ -1010,7 +1310,7 @@ document.addEventListener("DOMContentLoaded", () => {
             isDerived: false,
             isComposite: false,
             children: [],
-            offset: null,
+            offset: initialOffset,
             style: null
           });
           serializeAndSync();
@@ -1274,27 +1574,10 @@ document.addEventListener("DOMContentLoaded", () => {
       }
 
       if (selectedType === "attribute") {
-        // Resolve attribute context dynamically mapping using qualified ID
-        let parentId = "";
-        let attrId = "";
-        if (selectedId.includes("_attr_")) {
-          const parts = selectedId.split("_attr_");
-          parentId = parts[0];
-          attrId = parts[1];
-        }
-
-        let attrParent: any = null;
-        let attr: Attribute | null = null;
-
-        if (parentId && attrId) {
-          attrParent = parsedAST.entities.find((e: any) => e.id === parentId) || 
-                       parsedAST.relationships.find((r: any) => r.id === parentId);
-          if (attrParent) {
-            attr = attrParent.attributes.find((a: any) => a.id === attrId);
-          }
-        }
-
-        if (!attr) return;
+        const attrInfo = findAttributeByNodeId(selectedId);
+        if (!attrInfo) return;
+        const attr = attrInfo.attr;
+        const parentId = attrInfo.parentNodeId;
 
         inspectorContent.innerHTML = `
           <div class="inspector-group">
@@ -1389,12 +1672,14 @@ document.addEventListener("DOMContentLoaded", () => {
         });
 
         document.getElementById("btn-delete-node")?.addEventListener("click", () => {
-          if (attrParent && attr) {
-            recordState();
-            attrParent.attributes = attrParent.attributes.filter((a: any) => a.id !== attrId);
-            clearSelection();
-            serializeAndSync();
+          recordState();
+          if (attrInfo.parentAttr && attrInfo.parentAttr.children) {
+            attrInfo.parentAttr.children = attrInfo.parentAttr.children.filter((c: any) => c.id !== attr.id);
+          } else if (attrInfo.parentEntityOrRel && attrInfo.parentEntityOrRel.attributes) {
+            attrInfo.parentEntityOrRel.attributes = attrInfo.parentEntityOrRel.attributes.filter((a: any) => a.id !== attr.id);
           }
+          clearSelection();
+          serializeAndSync();
         });
       }
     } else if (selectedEdge) {

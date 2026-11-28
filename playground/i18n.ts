@@ -10,7 +10,8 @@ export const translations = {
       themeForest: "Verde Floresta",
       themeNeutral: "Neutro (P&B)",
       spacingLabel: "Espaçamento de Atributos:",
-      spacingDefault: "Padrão (Dinâmico)",
+      spacingManual: "Manual (Padrão)",
+      spacingDefault: "Dinâmico",
       spacingZigzag: "Zigue-zague Alternado",
       spacingClassic: "Clássico (Legado)",
       copyCode: "Copiar Código",
@@ -22,6 +23,8 @@ export const translations = {
       title: "Ferramentas",
       select: "Selecionar",
       selectTitle: "Ferramenta de Seleção (Esc)",
+      pan: "Mover",
+      panTitle: "Ferramenta de Mover / Pan (H)",
       entity: "Entidade",
       entityTitle: "Adicionar Entidade",
       rel: "Relac.",
@@ -98,7 +101,8 @@ export const translations = {
       themeForest: "Forest Green",
       themeNeutral: "Neutral (B&W)",
       spacingLabel: "Attribute Spacing:",
-      spacingDefault: "Default (Dynamic)",
+      spacingManual: "Manual (Default)",
+      spacingDefault: "Dynamic",
       spacingZigzag: "Zigzag Alternating",
       spacingClassic: "Classic (Legacy)",
       copyCode: "Copy Code",
@@ -110,6 +114,8 @@ export const translations = {
       title: "Tools",
       select: "Select",
       selectTitle: "Selection Tool (Esc)",
+      pan: "Pan",
+      panTitle: "Pan Tool (H)",
       entity: "Entity",
       entityTitle: "Add Entity",
       rel: "Rel",
@@ -181,7 +187,7 @@ export const translations = {
 
 export const DEFAULT_DIAGRAM_PT = `chenER
 tema default
-layout_atributos default
+layout_atributos manual
 
 entidade Cliente {
   id chave
@@ -228,7 +234,7 @@ entidade Tecnico
 
 export const DEFAULT_DIAGRAM_EN = `chenER
 theme default
-attribute_layout default
+attribute_layout manual
 
 entity Customer {
   id key

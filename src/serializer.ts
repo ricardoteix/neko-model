@@ -49,7 +49,7 @@ function stringifyAttribute(attr: Attribute): string {
     const childNames = attr.children.map(c => c.id).join(", ");
     res += ` composite(${childNames})`;
   }
-  res += stringifyBracketMetadata(attr.offset, attr.style, null, null);
+  res += stringifyBracketMetadata(attr.offset, attr.style, null, attr.pos || null);
   return res;
 }
 

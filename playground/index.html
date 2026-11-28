@@ -38,7 +38,8 @@
         <div class="select-wrapper">
           <label for="spacing-select" id="lbl-spacing-select">Espaçamento de Atributos:</label>
           <select id="spacing-select">
-            <option value="default" id="opt-spacing-default" selected>Padrão (Dinâmico)</option>
+            <option value="manual" id="opt-spacing-manual" selected>Manual (Padrão)</option>
+            <option value="default" id="opt-spacing-default">Dinâmico</option>
             <option value="zigzag" id="opt-spacing-zigzag">Zigue-zague Alternado</option>
             <option value="classic" id="opt-spacing-classic">Clássico (Legado)</option>
           </select>
@@ -66,6 +67,10 @@
           <button class="tool-btn active" id="tool-btn-select" data-tool="select" title="Ferramenta de Seleção (Esc)">
             <span class="tool-icon">↖</span>
             <span class="tool-label" id="tool-lbl-select">Selecionar</span>
+          </button>
+          <button class="tool-btn" id="tool-btn-pan" data-tool="pan" title="Mover Canvas / Pan (H)">
+            <span class="tool-icon">✋</span>
+            <span class="tool-label" id="tool-lbl-pan">Mover</span>
           </button>
           <div class="tool-divider"></div>
           <button class="tool-btn" id="tool-btn-entity" data-tool="entity" title="Adicionar Entidade">
