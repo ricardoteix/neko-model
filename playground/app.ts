@@ -1,10 +1,13 @@
 import { render, parseDSL, stringifyAST, layoutDiagram } from "../src/index";
 import { StyleOverride, Attribute } from "../src/types";
 import { initLanguage, getLanguage, setLanguage, getTranslation, DEFAULT_DIAGRAM_PT, DEFAULT_DIAGRAM_EN } from "./i18n";
+import { EditorView, basicSetup } from "codemirror";
+import { Compartment } from "@codemirror/state";
+import { getNekoEditorExtensions } from "./neko-lang";
 
 document.addEventListener("DOMContentLoaded", () => {
   const langSelect = document.getElementById("lang-select") as HTMLSelectElement;
-  const editor = document.getElementById("dsl-editor") as HTMLTextAreaElement;
+  const editorContainer = document.getElementById("dsl-editor") as HTMLDivElement;
   const preview = document.getElementById("canvas-preview") as HTMLDivElement;
   const themeSelect = document.getElementById("theme-select") as HTMLSelectElement;
   const spacingSelect = document.getElementById("spacing-select") as HTMLSelectElement;
@@ -32,6 +35,34 @@ document.addEventListener("DOMContentLoaded", () => {
   const errorMessage = document.getElementById("error-message") as HTMLElement;
 
   let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+  const themeCompartment = new Compartment();
+  const isDarkInit = document.body.classList.contains("dark") || themeSelect?.value === "dark";
+
+  const cmEditor = new EditorView({
+    parent: editorContainer,
+    extensions: [
+      basicSetup,
+      themeCompartment.of(getNekoEditorExtensions(isDarkInit)),
+      EditorView.updateListener.of((update) => {
+        if (update.docChanged) {
+          if (debounceTimer) clearTimeout(debounceTimer);
+          debounceTimer = setTimeout(compileDiagram, 250);
+        }
+      })
+    ]
+  });
+
+  const editor = {
+    get value(): string {
+      return cmEditor.state.doc.toString();
+    },
+    set value(newVal: string) {
+      if (cmEditor.state.doc.toString() === newVal) return;
+      cmEditor.dispatch({
+        changes: { from: 0, to: cmEditor.state.doc.length, insert: newVal }
+      });
+    }
+  };
   
   // Viewport Transform State (Panning and Zooming)
   let currentZoom = 1.0;
@@ -299,18 +330,16 @@ document.addEventListener("DOMContentLoaded", () => {
     compileDiagram(skipInspectorUpdate);
   }
 
-  // Input listener with a 250ms debounce
-  editor.addEventListener("input", () => {
-    if (debounceTimer) clearTimeout(debounceTimer);
-    debounceTimer = setTimeout(compileDiagram, 250);
-  });
-
   function updateBodyThemeClass() {
     const val = themeSelect.value;
     document.body.classList.remove("dark", "forest", "neutral");
     if (val !== "default") {
       document.body.classList.add(val);
     }
+    const isDark = val === "dark";
+    cmEditor.dispatch({
+      effects: themeCompartment.reconfigure(getNekoEditorExtensions(isDark))
+    });
   }
 
   themeSelect.addEventListener("change", () => {

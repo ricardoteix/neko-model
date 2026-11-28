@@ -266,21 +266,27 @@ body, html {
   flex: 1;
   position: relative;
   overflow: hidden;
+  display: flex;
+  flex-direction: column;
 }
 
 #dsl-editor {
+  flex: 1;
   width: 100%;
   height: 100%;
-  background-color: transparent;
-  color: #38bdf8; /* light blue code text */
-  border: none;
-  resize: none;
+  overflow: hidden;
+  position: relative;
+}
+
+#dsl-editor .cm-editor {
+  height: 100%;
   outline: none;
+}
+
+#dsl-editor .cm-scroller {
+  overflow: auto;
   font-family: var(--font-mono);
-  font-size: 14px;
-  line-height: 1.6;
-  padding: 20px;
-  tab-size: 4;
+  font-size: 13.5px;
 }
 
 /* Visualizer / Preview Window */

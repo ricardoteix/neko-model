@@ -11,7 +11,7 @@
     "build:lib": "vite build --config vite.config.ts",
     "build:playground": "vite build --config vite.playground.config.ts",
     "build": "npm run build:lib && npm run build:playground",
-    "test": "vitest run", 
+    "test": "vitest run",
     "predeploy": "npm run build",
     "deploy": "gh-pages -d dist-playground"
   },
@@ -30,7 +30,10 @@
     "dagre": "^0.8.5"
   },
   "devDependencies": {
+    "@codemirror/language": "^6.13.1",
+    "@lezer/highlight": "^1.2.5",
     "@types/dagre": "^0.7.48",
+    "codemirror": "^6.0.2",
     "typescript": "^5.4.5",
     "vite": "^5.2.11",
     "vite-plugin-dts": "^3.9.1",
