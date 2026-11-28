@@ -8,8 +8,8 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,300;0,400;0,500;1,300&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-  <script type="module" crossorigin src="./assets/index-Cuj7myez.js"></script>
-  <link rel="stylesheet" crossorigin href="./assets/index-Cb7BoP0X.css">
+  <script type="module" crossorigin src="./assets/index-C9fclBiP.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-CLZi7VdQ.css">
 </head>
 <body>
   <div class="app-container">
@@ -39,7 +39,8 @@
         <div class="select-wrapper">
           <label for="spacing-select" id="lbl-spacing-select">Espaçamento de Atributos:</label>
           <select id="spacing-select">
-            <option value="default" id="opt-spacing-default" selected>Padrão (Dinâmico)</option>
+            <option value="manual" id="opt-spacing-manual" selected>Manual (Padrão)</option>
+            <option value="default" id="opt-spacing-default">Dinâmico</option>
             <option value="zigzag" id="opt-spacing-zigzag">Zigue-zague Alternado</option>
             <option value="classic" id="opt-spacing-classic">Clássico (Legado)</option>
           </select>
@@ -47,12 +48,27 @@
         <button id="btn-copy" class="btn" title="Copiar Código">
           Copiar Código
         </button>
+        <button id="btn-open-nkm" class="btn" title="Abrir arquivo .nkm">
+          Abrir .nkm
+        </button>
+        <input type="file" id="input-open-nkm" accept=".nkm,.txt" style="display: none;" />
         <button id="btn-export-nkm" class="btn" title="Exportar .nkm">
           Exportar .nkm
         </button>
-        <button id="btn-export-svg" class="btn btn-primary" title="Exportar SVG">
-          Exportar SVG
-        </button>
+        <div class="dropdown-wrapper" id="dropdown-export-wrapper">
+          <button id="btn-export-img" class="btn btn-primary" title="Exportar Imagem">
+            <span id="lbl-export-img">Exportar Imagem</span>
+            <span class="dropdown-arrow" style="font-size: 10px; margin-left: 2px;">▾</span>
+          </button>
+          <div id="export-dropdown-menu" class="dropdown-menu hidden">
+            <button id="btn-export-svg" class="dropdown-item">
+              <span id="lbl-export-svg">Exportar SVG</span>
+            </button>
+            <button id="btn-export-png" class="dropdown-item">
+              <span id="lbl-export-png">Exportar PNG</span>
+            </button>
+          </div>
+        </div>
       </div>
     </header>
 
@@ -67,6 +83,10 @@
           <button class="tool-btn active" id="tool-btn-select" data-tool="select" title="Ferramenta de Seleção (Esc)">
             <span class="tool-icon">↖</span>
             <span class="tool-label" id="tool-lbl-select">Selecionar</span>
+          </button>
+          <button class="tool-btn" id="tool-btn-pan" data-tool="pan" title="Mover Canvas / Pan (H)">
+            <span class="tool-icon">✋</span>
+            <span class="tool-label" id="tool-lbl-pan">Mover</span>
           </button>
           <div class="tool-divider"></div>
           <button class="tool-btn" id="tool-btn-entity" data-tool="entity" title="Adicionar Entidade">
@@ -95,7 +115,7 @@
           <span class="file-name" id="editor-file-name">diagrama.nkm</span>
         </div>
         <div class="editor-wrapper">
-          <textarea id="dsl-editor" spellcheck="false" autocomplete="off"></textarea>
+          <div id="dsl-editor" class="dsl-editor-container"></div>
         </div>
       </section>
 
