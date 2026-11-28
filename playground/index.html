@@ -50,9 +50,20 @@
         <button id="btn-export-nkm" class="btn" title="Exportar .nkm">
           Exportar .nkm
         </button>
-        <button id="btn-export-svg" class="btn btn-primary" title="Exportar SVG">
-          Exportar SVG
-        </button>
+        <div class="dropdown-wrapper" id="dropdown-export-wrapper">
+          <button id="btn-export-img" class="btn btn-primary" title="Exportar Imagem">
+            <span id="lbl-export-img">Exportar Imagem</span>
+            <span class="dropdown-arrow" style="font-size: 10px; margin-left: 2px;">▾</span>
+          </button>
+          <div id="export-dropdown-menu" class="dropdown-menu hidden">
+            <button id="btn-export-svg" class="dropdown-item">
+              <span id="lbl-export-svg">Exportar SVG</span>
+            </button>
+            <button id="btn-export-png" class="dropdown-item">
+              <span id="lbl-export-png">Exportar PNG</span>
+            </button>
+          </div>
+        </div>
       </div>
     </header>
 

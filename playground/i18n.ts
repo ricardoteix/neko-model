@@ -17,7 +17,9 @@ export const translations = {
       copyCode: "Copiar Código",
       copied: "Copiado!",
       exportNkm: "Exportar .nkm",
+      exportImage: "Exportar Imagem",
       exportSvg: "Exportar SVG",
+      exportPng: "Exportar PNG",
     },
     toolbox: {
       title: "Ferramentas",
@@ -108,7 +110,9 @@ export const translations = {
       copyCode: "Copy Code",
       copied: "Copied!",
       exportNkm: "Export .nkm",
+      exportImage: "Export Image",
       exportSvg: "Export SVG",
+      exportPng: "Export PNG",
     },
     toolbox: {
       title: "Tools",

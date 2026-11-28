@@ -13,7 +13,10 @@ document.addEventListener("DOMContentLoaded", () => {
   const spacingSelect = document.getElementById("spacing-select") as HTMLSelectElement;
   const btnCopy = document.getElementById("btn-copy") as HTMLButtonElement;
   const btnExportNkm = document.getElementById("btn-export-nkm") as HTMLButtonElement;
+  const btnExportImg = document.getElementById("btn-export-img") as HTMLButtonElement;
+  const exportDropdownMenu = document.getElementById("export-dropdown-menu") as HTMLDivElement;
   const btnExportSvg = document.getElementById("btn-export-svg") as HTMLButtonElement;
+  const btnExportPng = document.getElementById("btn-export-png") as HTMLButtonElement;
   
   const btnZoomIn = document.getElementById("btn-zoom-in") as HTMLButtonElement;
   const btnZoomOut = document.getElementById("btn-zoom-out") as HTMLButtonElement;
@@ -1169,10 +1172,17 @@ document.addEventListener("DOMContentLoaded", () => {
       btnExportNkm.textContent = t.header.exportNkm;
       btnExportNkm.title = t.header.exportNkm;
     }
-    if (btnExportSvg) {
-      btnExportSvg.textContent = t.header.exportSvg;
-      btnExportSvg.title = t.header.exportSvg;
-    }
+    const lblExportImg = document.getElementById("lbl-export-img");
+    if (lblExportImg) lblExportImg.textContent = (t.header as any).exportImage || "Exportar Imagem";
+    if (btnExportImg) btnExportImg.title = (t.header as any).exportImage || "Exportar Imagem";
+
+    const lblExportSvg = document.getElementById("lbl-export-svg");
+    if (lblExportSvg) lblExportSvg.textContent = t.header.exportSvg;
+    if (btnExportSvg) btnExportSvg.title = t.header.exportSvg;
+
+    const lblExportPng = document.getElementById("lbl-export-png");
+    if (lblExportPng) lblExportPng.textContent = (t.header as any).exportPng || "Exportar PNG";
+    if (btnExportPng) btnExportPng.title = (t.header as any).exportPng || "Exportar PNG";
 
     // Toolbox
     const toolboxTitle = document.getElementById("toolbox-title");
@@ -1853,8 +1863,25 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
 
+  // Toggle export dropdown menu
+  btnExportImg?.addEventListener("click", (e) => {
+    e.stopPropagation();
+    exportDropdownMenu?.classList.toggle("hidden");
+  });
+
+  // Close dropdown when clicking outside
+  document.addEventListener("click", (e) => {
+    if (!exportDropdownMenu?.classList.contains("hidden")) {
+      const target = e.target as HTMLElement;
+      if (!target.closest("#dropdown-export-wrapper")) {
+        exportDropdownMenu?.classList.add("hidden");
+      }
+    }
+  });
+
   // Export diagram as static SVG file download
-  btnExportSvg.addEventListener("click", () => {
+  btnExportSvg?.addEventListener("click", () => {
+    exportDropdownMenu?.classList.add("hidden");
     try {
       const code = editor.value;
       const theme = themeSelect.value as any;
@@ -1873,6 +1900,89 @@ document.addEventListener("DOMContentLoaded", () => {
       URL.revokeObjectURL(url);
     } catch (err: any) {
       alert("Failed to export SVG: " + err.message);
+    }
+  });
+
+  // Export diagram as high-resolution PNG file download
+  btnExportPng?.addEventListener("click", () => {
+    exportDropdownMenu?.classList.add("hidden");
+    try {
+      const code = editor.value;
+      const theme = themeSelect.value as any;
+      const attribute_layout = spacingSelect.value as any;
+      const svgContent = render(code, { theme, attribute_layout });
+
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(svgContent, "image/svg+xml");
+      const svgEl = doc.querySelector("svg");
+      if (!svgEl) throw new Error("Could not parse SVG document");
+
+      const viewBoxAttr = svgEl.getAttribute("viewBox");
+      let vbWidth = 1000;
+      let vbHeight = 700;
+      if (viewBoxAttr) {
+        const parts = viewBoxAttr.trim().split(/[\s,]+/);
+        if (parts.length === 4) {
+          vbWidth = parseFloat(parts[2]) || 1000;
+          vbHeight = parseFloat(parts[3]) || 700;
+        }
+      }
+
+      // Scale factor 2x (Retina) for ultra-sharp text and lines
+      const scale = 2;
+      const width = Math.max(800, Math.round(vbWidth * scale));
+      const height = Math.max(600, Math.round(vbHeight * scale));
+
+      // Set explicit dimensions on SVG element so browser decodes Image at full resolution
+      svgEl.setAttribute("width", width.toString());
+      svgEl.setAttribute("height", height.toString());
+      const fullSvgContent = new XMLSerializer().serializeToString(svgEl);
+
+      const svgBlob = new Blob([fullSvgContent], { type: "image/svg+xml;charset=utf-8" });
+      const svgUrl = URL.createObjectURL(svgBlob);
+
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) {
+          URL.revokeObjectURL(svgUrl);
+          throw new Error("Could not initialize canvas context");
+        }
+
+        // Fill background matching theme
+        if (theme === "dark") {
+          ctx.fillStyle = "#0f172a";
+        } else if (theme === "forest") {
+          ctx.fillStyle = "#064e3b";
+        } else {
+          ctx.fillStyle = "#ffffff";
+        }
+        ctx.fillRect(0, 0, width, height);
+        ctx.drawImage(img, 0, 0, width, height);
+        URL.revokeObjectURL(svgUrl);
+
+        canvas.toBlob((pngBlob) => {
+          if (!pngBlob) return;
+          const pngUrl = URL.createObjectURL(pngBlob);
+          const link = document.createElement("a");
+          link.href = pngUrl;
+          link.download = "chen-er-diagram.png";
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+          URL.revokeObjectURL(pngUrl);
+        }, "image/png");
+      };
+      img.onerror = () => {
+        URL.revokeObjectURL(svgUrl);
+        alert("Failed to render PNG image from diagram");
+      };
+      img.src = svgUrl;
+    } catch (err: any) {
+      alert("Failed to export PNG: " + err.message);
     }
   });
 
